@@ -1,0 +1,214 @@
+;======================================
+; プログラム開始
+;======================================
+START	START
+;;
+;======================================
+; メインプログラム
+;======================================
+MAIN		NOP
+;----
+			CALL	MEZCRT
+			;--------------------------------------
+			; 入力処理
+			;--------------------------------------
+			IN		IN,INL
+			JUMP	MAIN
+			RET
+			;--------------------------------------
+			; 初期化処理
+			;--------------------------------------
+			; プレイヤーの座標初期化
+			LAD		GR0,5
+			ST		GR0,PLYX
+			LAD		GR0,5
+			ST		GR0,PLYY
+;----
+			; 画面の初期化
+			CALL	CLRSBUF
+			CALL	DRWPLY
+			CALL	DRWSBUF
+;----
+			;======================================
+			; メインプループ
+			;======================================
+MAINL		NOP
+;----
+			;--------------------------------------
+			; 入力処理
+			;--------------------------------------
+			IN		IN,INL
+;----
+			;--------------------------------------
+			; 終了判定
+			;--------------------------------------
+			LD		GR0,IN
+			CPA		GR0,='E'
+			JZE		MAINED
+;----
+			;--------------------------------------
+			; 更新処理
+			;--------------------------------------
+			; プレイヤーの更新
+			CALL	UPDPLY
+;----
+			;--------------------------------------
+			; 描画処理
+			;--------------------------------------
+			CALL	CLRSBUF			; 画面バッファのクリア
+			CALL	DRWPLY			; プレイヤーの描画
+			CALL	DRWSBUF			; 画面バッファの描画
+;----
+			;======================================
+			; メインプループ終了
+			;======================================
+			JUMP	MAINL
+;----
+MAINED		RET
+;----
+;----
+;----
+;======================================
+; メインプログラムデータ
+;======================================
+; 入力バッファ
+IN			DS	8
+INL			DS	1
+;----
+; プレイヤー情報
+PLYX		DS	1
+PLYY		DS	1
+;----
+; 文字キャラクタの定義
+PCHR		DC	'@'		; プレイヤーキャラクタ
+WCHR		DC	'w'		; 壁キャラクタ
+CCHR		DC	' '		; 空白キャラ
+;----
+; 画面バッファ
+SCRLINE0	DS	20
+SCRLINE1	DS	20
+SCRLINE2	DS	20
+SCRLINE3	DS	20
+SCRLINE4	DS	20
+SCRLINE5	DS	20
+SCRLINE6	DS	20
+SCRLINE7	DS	20
+SCRLINE8	DS	20
+SCRLINE9	DS	20
+SCRBUF		DC	SCRLINE0,SCRLINE1,SCRLINE2,SCRLINE3,SCRLINE4
+SCRBUF2		DC	SCRLINE5,SCRLINE6,SCRLINE7,SCRLINE8,SCRLINE9
+;----
+LINELEN		DC	20		; 画面ラインの長さ
+LINENUM		DC	10		; 画面ラインの数
+;----
+DATA		DS	30
+;----
+;----
+;======================================
+; 画面バッファのクリア
+;======================================
+CLRSBUF		LD		GR4,WCHR
+			LAD		GR5,0
+;----
+		; 画面ラインの数分ループ		
+			LAD		GR1,0
+CLRSBL0		NOP
+;----
+		; 画面ラインの長さ分ループ		
+			LAD		GR2,0
+CLRSBL1		ST		GR4,SCRLINE0,GR5
+			LAD		GR5,1,GR5
+			LAD		GR2,1,GR2
+			CPA		GR2,LINELEN
+			JNZ		CLRSBL1
+;----
+			LAD		GR1,1,GR1
+			CPA		GR1,LINENUM
+			JNZ		CLRSBL0
+			RET
+;----
+;----
+;======================================
+; 画面バッファの描画
+;======================================
+DRWSBUF		OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		SCRLINE0,LINELEN
+			OUT		SCRLINE1,LINELEN
+			OUT		SCRLINE2,LINELEN
+			OUT		SCRLINE3,LINELEN
+			OUT		SCRLINE4,LINELEN
+			OUT		SCRLINE5,LINELEN
+			OUT		SCRLINE6,LINELEN
+			OUT		SCRLINE7,LINELEN
+			OUT		SCRLINE8,LINELEN
+			OUT		SCRLINE9,LINELEN
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			RET
+;----
+NUM1		DC	1
+;----
+;----
+;======================================
+; プレイヤーの更新
+;======================================
+UPDPLY		LD		GR0,IN
+			CPA		GR0,='4'
+			JZE		UPDPLY4
+			CPA		GR0,='6'
+			JZE		UPDPLY6
+			CPA		GR0,='8'
+			JZE		UPDPLY8
+			CPA		GR0,='2'
+			JZE		UPDPLY2
+			JUMP	UPDPLYED
+;----
+UPDPLY4		LD		GR0,PLYX
+			SUBA	GR0,=1
+			ST		GR0,PLYX
+			JUMP	UPDPLYED
+;----
+UPDPLY6		LD		GR0,PLYX
+			ADDA	GR0,=1
+			ST		GR0,PLYX
+			JUMP	UPDPLYED
+;----
+UPDPLY8		LD		GR0,PLYY
+			SUBA	GR0,=1
+			ST		GR0,PLYY
+			JUMP	UPDPLYED
+;----
+UPDPLY2		LD		GR0,PLYY
+			ADDA	GR0,=1
+			ST		GR0,PLYY
+			JUMP	UPDPLYED
+;----
+UPDPLYED	RET
+;----
+;----
+;======================================
+; プレイヤーの描画
+;======================================
+DRWPLY		LD		GR1,PLYY
+			LD		GR2,SCRBUF,GR1
+			ADDL	GR2,PLYX
+			LD		GR0,PCHR
+			ST		GR0,0,GR2
+			RET
+;----
+;----
+;======================================
+; プログラム終了
+;======================================
+		END

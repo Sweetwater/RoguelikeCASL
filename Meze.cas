@@ -1,0 +1,183 @@
+;======================================
+; 迷路プログラム
+;======================================
+;----
+;----
+;======================================
+; 迷路生成
+;======================================
+MEZCRT		START
+			CALL	MEZCLR
+;----
+			LD		GR0,WALDAT
+;----
+			; 外壁を埋める
+			; 上下壁
+			LD		GR1,MEZLLEN
+MEZCRTL0	SUBL	GR1,=1
+			ST		GR0,MEZL00,GR1
+			ST		GR0,MEZL10,GR1
+			JNZ		MEZCRTL0
+;----
+			; 左右壁
+			LD		GR1,MESLNUM
+			LAD		GR2,0
+MEZCRTL1	ST		GR0,MEZL00,GR2
+			ST		GR0,MEZL00R,GR2
+			ADDL	GR2,MEZLLEN
+			SUBL	GR1,=1
+			JNZ		MEZCRTL1
+;----
+			; 棒倒し法で壁を生成
+;----
+			;----------------
+			; 一段目は上も倒す
+			LD		GR1,MEZSTR0
+MEZCRTL2	NOP
+			; 既に壁があったら処理を飛ばす
+			LD		GR2,MEZL00,GR1
+			CPA		GR2,CLRDAT
+			JNZ		MEZCRNX0
+;----
+			; 壁を設定
+			ST		GR0,MEZL00,GR1
+;----
+			; 壁の無いマスが出るまでランダムを取得する
+RNDL0		CALL	RND
+			AND		GR7,=#0003
+			LD		GR7,PICH,GR7
+			ADDA	GR7,GR1
+			LD		GR2,MEZL00,GR7
+			CPA		GR2,CLRDAT
+			JNZ		RNDL0
+;----
+			; 壁を設定
+			ST		GR0,MEZL00,GR7
+;----
+MEZCRNX0	LAD		GR1,2,GR1
+			CPA		GR1,MEZEND0
+			JMI		MEZCRTL2
+;----
+;----
+			;----------------
+			; 二段目以降は上以外に壁を設定
+			LD		GR1,MEZSTR1
+MEZCRTL3	LD		GR2,MEZLNUM
+MEZCRTL4	NOP
+;----
+			; 既に壁があったら処理を飛ばす
+			LD		GR3,MEZL00,GR1
+			CPA		GR3,CLRDAT
+			JNZ		MEZCRNX1
+;----
+			; 壁を設定
+			ST		GR0,MEZL00,GR1
+;----
+			; 壁が無くて上以外のマスが出るまでランダムを取得する
+RNDL1		CALL	RND
+			; 上ならもう一度ランダム取得
+			AND		GR7,=#0003
+			JZE		RNDL1
+			; 既に壁があったらもう一度ランダム取得
+			LD		GR7,PICH,GR7
+			ADDA	GR7,GR1
+			LD		GR3,MEZL00,GR7
+			CPA		GR3,CLRDAT
+			JNZ		RNDL1
+;----
+			; 壁を設定
+			ST		GR0,MEZL00,GR7
+;----
+MEZCRNX1	LAD		GR1,2,GR1
+			SUBA	GR2,=1
+			JNZ		MEZCRTL4
+;----
+			ADDA	GR1,MEZLLEN
+			CPA		GR1,MEZEND1
+			JMI		MEZCRTL3
+;----
+;----
+			CALL	MEZDRW
+			RET
+;----
+WALDAT		DC		'*'
+PICH		DC		 -20,-1,1,20
+;----
+;----
+;======================================
+; 迷路クリア
+;======================================
+MEZCLR		LD		GR0,CLRDAT
+			LD		GR1,MEZDATSZ
+MEZCLRL		SUBL	GR1,=1
+			ST		GR0,MEZL00,GR1
+			JNZ		MEZCLRL
+			RET
+CLRDAT		DC		' '
+;----
+;----
+;======================================
+; 迷路描画
+;======================================
+MEZDRW		OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		MEZL00,MEZLLEN
+			OUT		MEZL01,MEZLLEN
+			OUT		MEZL02,MEZLLEN
+			OUT		MEZL03,MEZLLEN
+			OUT		MEZL04,MEZLLEN
+			OUT		MEZL05,MEZLLEN
+			OUT		MEZL06,MEZLLEN
+			OUT		MEZL07,MEZLLEN
+			OUT		MEZL08,MEZLLEN
+			OUT		MEZL09,MEZLLEN
+			OUT		MEZL10,MEZLLEN
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			OUT		CCHR,NUM1
+			RET
+;----
+CCHR		DC		' '
+;----
+;----
+;----
+;======================================
+; 迷路データ
+;======================================
+MEZL00		DS		19
+MEZL00R		DS		1
+MEZL01		DS		20
+MEZL02		DS		20
+MEZL03		DS		20
+MEZL04		DS		20
+MEZL05		DS		20
+MEZL06		DS		20
+MEZL07		DS		20
+MEZL08		DS		20
+MEZL09		DS		20
+MEZL10		DS		20
+MEZDAT		DC		MEZL00,MEZL01,MEZL02,MEZL03,MEZL04
+MEZDAT1		DC		MEZL05,MEZL06,MEZL07,MEZL08,MEZL09
+MEZDAT2		DC		MEZL10
+;----
+MEZLLEN		DC		20
+MESLNUM		DC		11
+MEZDATSZ	DC		220
+;----
+MEZSTR0		DC		40
+MEZEND0		DC		60
+;----
+MEZLNUM		DC		10
+MEZSTR1		DC		80
+MEZEND1		DC		220
+;----
+NUM1		DC		1
+			END
