@@ -1,20 +1,16 @@
-;======================================
+;**************************************
 ; プログラム開始
-;======================================
+;----
+;----
+;**************************************
 START	START
-;;
+;----
+;----
 ;======================================
 ; メインプログラム
 ;======================================
 MAIN		NOP
 ;----
-			CALL	MEZCRT
-			;--------------------------------------
-			; 入力処理
-			;--------------------------------------
-			IN		IN,INL
-			JUMP	MAIN
-			RET
 			;--------------------------------------
 			; 初期化処理
 			;--------------------------------------
@@ -24,8 +20,12 @@ MAIN		NOP
 			LAD		GR0,5
 			ST		GR0,PLYY
 ;----
+			; 迷路の生成
+			CALL	MEZCRT
+;----
 			; 画面の初期化
 			CALL	CLRSBUF
+			CALL	MEZDRW
 			CALL	DRWPLY
 			CALL	DRWSBUF
 ;----
@@ -56,6 +56,7 @@ MAINL		NOP
 			; 描画処理
 			;--------------------------------------
 			CALL	CLRSBUF			; 画面バッファのクリア
+			CALL	MEZDRW			; 迷路の描画
 			CALL	DRWPLY			; プレイヤーの描画
 			CALL	DRWSBUF			; 画面バッファの描画
 ;----
@@ -81,27 +82,31 @@ PLYY		DS	1
 ;----
 ; 文字キャラクタの定義
 PCHR		DC	'@'		; プレイヤーキャラクタ
-WCHR		DC	'w'		; 壁キャラクタ
+WCHR		DC	'#'		; 壁キャラクタ
 CCHR		DC	' '		; 空白キャラ
 ;----
 ; 画面バッファ
-SCRLINE0	DS	20
-SCRLINE1	DS	20
-SCRLINE2	DS	20
-SCRLINE3	DS	20
-SCRLINE4	DS	20
-SCRLINE5	DS	20
-SCRLINE6	DS	20
-SCRLINE7	DS	20
-SCRLINE8	DS	20
-SCRLINE9	DS	20
-SCRBUF		DC	SCRLINE0,SCRLINE1,SCRLINE2,SCRLINE3,SCRLINE4
-SCRBUF2		DC	SCRLINE5,SCRLINE6,SCRLINE7,SCRLINE8,SCRLINE9
+SCRL00		DS	40
+SCRL01		DS	40
+SCRL02		DS	40
+SCRL03		DS	40
+SCRL04		DS	40
+SCRL05		DS	40
+SCRL06		DS	40
+SCRL07		DS	40
+SCRL08		DS	40
+SCRL09		DS	40
+SCRL10		DS	40
+SCRL11		DS	40
+SCRL12		DS	40
+SCRL13		DS	40
+SCRL14		DS	40
+SCRBUF		DC	SCRL00,SCRL01,SCRL02,SCRL03,SCRL04
+SCRBUF1		DC	SCRL05,SCRL06,SCRL07,SCRL08,SCRL09
+SCRBUF2		DC	SCRL10,SCRL11,SCRL12,SCRL13,SCRL14
 ;----
-LINELEN		DC	20		; 画面ラインの長さ
-LINENUM		DC	10		; 画面ラインの数
-;----
-DATA		DS	30
+LINELEN		DC	40		; 画面ラインの長さ
+LINENUM		DC	15		; 画面ラインの数
 ;----
 ;----
 ;======================================
@@ -116,7 +121,7 @@ CLRSBL0		NOP
 ;----
 		; 画面ラインの長さ分ループ		
 			LAD		GR2,0
-CLRSBL1		ST		GR4,SCRLINE0,GR5
+CLRSBL1		ST		GR4,SCRL00,GR5
 			LAD		GR5,1,GR5
 			LAD		GR2,1,GR2
 			CPA		GR2,LINELEN
@@ -133,24 +138,21 @@ CLRSBL1		ST		GR4,SCRLINE0,GR5
 ;======================================
 DRWSBUF		OUT		CCHR,NUM1
 			OUT		CCHR,NUM1
-			OUT		SCRLINE0,LINELEN
-			OUT		SCRLINE1,LINELEN
-			OUT		SCRLINE2,LINELEN
-			OUT		SCRLINE3,LINELEN
-			OUT		SCRLINE4,LINELEN
-			OUT		SCRLINE5,LINELEN
-			OUT		SCRLINE6,LINELEN
-			OUT		SCRLINE7,LINELEN
-			OUT		SCRLINE8,LINELEN
-			OUT		SCRLINE9,LINELEN
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
+			OUT		SCRL00,LINELEN
+			OUT		SCRL01,LINELEN
+			OUT		SCRL02,LINELEN
+			OUT		SCRL03,LINELEN
+			OUT		SCRL04,LINELEN
+			OUT		SCRL05,LINELEN
+			OUT		SCRL06,LINELEN
+			OUT		SCRL07,LINELEN
+			OUT		SCRL08,LINELEN
+			OUT		SCRL09,LINELEN
+			OUT		SCRL10,LINELEN
+			OUT		SCRL11,LINELEN
+			OUT		SCRL12,LINELEN
+			OUT		SCRL13,LINELEN
+			OUT		SCRL14,LINELEN
 			OUT		CCHR,NUM1
 			OUT		CCHR,NUM1
 			OUT		CCHR,NUM1
@@ -208,7 +210,222 @@ DRWPLY		LD		GR1,PLYY
 			RET
 ;----
 ;----
+;----
+;----
+;**************************************
+; 迷路プログラム
+;----
+;----
+;**************************************
+;----
+;----
 ;======================================
+; 迷路生成
+;======================================
+MEZCRT		CALL	MEZCLR
+;----
+			LD		GR0,WALDAT
+;----
+			; 外壁を埋める
+			; 上下壁
+			LD		GR1,MEZLLEN
+MEZCRTL0	SUBL	GR1,=1
+			ST		GR0,MEZL00,GR1
+			ST		GR0,MEZL12,GR1
+			JNZ		MEZCRTL0
+;----
+			; 左右壁
+			LD		GR1,MESLNUM
+			LAD		GR2,0
+MEZCRTL1	ST		GR0,MEZL00,GR2
+			ST		GR0,MEZL00R,GR2
+			ADDL	GR2,MEZLLEN
+			SUBL	GR1,=1
+			JNZ		MEZCRTL1
+;----
+			; 棒倒し法で壁を生成
+;----
+			;----------------
+			; 一段目は上も倒す
+			LD		GR1,MEZSTR0
+MEZCRTL2	NOP
+			; 既に壁があったら処理を飛ばす
+			LD		GR2,0,GR1
+			CPA		GR2,CLRDAT
+			JNZ		MEZCRNX0
+;----
+			; 壁を設定
+			ST		GR0,0,GR1
+;----
+			; 壁の無いマスが出るまでランダムを取得する
+RNDL0		CALL	RND
+			AND		GR7,=#0003
+			LD		GR7,PICH,GR7
+			ADDA	GR7,GR1
+			LD		GR2,0,GR7
+			CPA		GR2,CLRDAT
+			JNZ		RNDL0
+;----
+			; 棒倒し壁を設定
+			ST		GR0,0,GR7
+;----
+MEZCRNX0	LAD		GR1,2,GR1
+			CPA		GR1,MEZEND0
+			JMI		MEZCRTL2
+;----
+;----
+			;----------------
+			; 二段目以降は上以外に壁を設定
+			LD		GR1,MEZSTR1
+MEZCRTL3	LD		GR2,0
+MEZCRTL4	NOP
+;----
+			; 既に壁があったら処理を飛ばす
+			LD		GR3,0,GR1
+			CPA		GR3,CLRDAT
+			JNZ		MEZCRNX1
+;----
+			; 壁を設定
+			ST		GR0,0,GR1
+;----
+			; 壁が無くて上以外のマスが出るまでランダムを取得する
+RNDL1		CALL	RND
+			; 上ならもう一度ランダム取得
+			AND		GR7,=#0003
+			JZE		RNDL1
+			; 既に壁があったらもう一度ランダム取得
+			LD		GR7,PICH,GR7
+			ADDA	GR7,GR1
+			LD		GR3,0,GR7
+			CPA		GR3,CLRDAT
+			JNZ		RNDL1
+;----
+			; 棒倒し壁を設定
+			ST		GR0,0,GR7
+;----
+MEZCRNX1	LAD		GR1,2,GR1
+			LAD		GR2,2,GR2
+			CPA		GR2,MEZLLEN
+			JMI		MEZCRTL4
+;----
+			ADDA	GR1,MEZLLEN
+			LAD		GR1,-1,GR1
+;			AND		GR1,=#FFFE
+			CPA		GR1,MEZEND1
+			JMI		MEZCRTL3
+;----
+;----
+			RET
+;----
+WALDAT		DC	'#'
+PICH		DC	 -31,-1,1,31
+;----
+;----
+;======================================
+; 迷路クリア
+;======================================
+MEZCLR		LD		GR0,CLRDAT
+			LD		GR1,MEZDATSZ
+MEZCLRL		SUBL	GR1,=1
+			ST		GR0,MEZL00,GR1
+			JNZ		MEZCLRL
+			RET
+CLRDAT		DC	' '
+;----
+;----
+;======================================
+; 迷路描画
+;======================================
+MEZDRW		LAD		GR1,0
+;----
+MEZDRWL0	LAD		GR2,0
+			LD		GR3,MEZDAT,GR1
+			LD		GR4,SCRBUF,GR1
+;----
+MEZDRWL1	LD		GR0,0,GR3
+			ST		GR0,0,GR4
+;----
+			LAD		GR3,1,GR3
+			LAD		GR4,1,GR4
+			LAD		GR2,1,GR2
+			CPA		GR2,MEZLLEN
+			JMI		MEZDRWL1
+;----
+			LAD		GR1,1,GR1
+			CPA		GR1,MESLNUM
+			JMI		MEZDRWL0
+			RET
+;----
+;CCHR		DC		' '
+;----
+;----
+;----
+;======================================
+; 迷路データ
+;======================================
+MEZL00		DS	30		; 上壁,左壁開始
+MEZL00R		DS	1		; 右壁開始
+MEZL01		DS	31		; 空白行
+MEZL02		DS	31		; 1段目柱行
+MEZL03		DS	31		; 空白行
+MEZL04		DS	31		; 2段目柱行
+MEZL05		DS	31		; 空白行
+MEZL06		DS	31		; 柱行
+MEZL07		DS	31		; 空白行
+MEZL08		DS	31		; 柱行
+MEZL09		DS	31		; 空白行
+MEZL10		DS	31		; 柱行
+MEZL11		DS	31		; 空白行
+MEZL12		DS	31		; 下壁
+MEZDAT		DC	MEZL00,MEZL01,MEZL02,MEZL03,MEZL04
+MEZDAT1		DC	MEZL05,MEZL06,MEZL07,MEZL08,MEZL09
+MEZDAT2		DC	MEZL10,MEZL11,MEZL12
+;----
+MEZLLEN		DC	31
+MESLNUM		DC	13
+MEZDATSZ	DC	403
+;----
+; 一段目の開始アドレスと終了アドレス
+MEZSTR0		DC	MEZL02
+MEZEND0		DC	MEZL03
+;----
+; 二段目以降の開始アドレスと終了アドレス
+MEZSTR1		DC	MEZL04
+MEZEND1		DC	MEZL11
+;----
+;NUM1		DC	1
+;----
+;----
+;----
+;----
+;**************************************
+; ユーティリティモジュール
+;----
+;----
+;**************************************
+;----
+;----
+;======================================
+; ランダム関数
+;======================================
+RND			LD		GR7,SEED
+			LD		GR6,GR7
+			SLL		GR7,2
+			ADDL	GR7,GR6
+			ADDL	GR7,=#3711
+			ST		GR7,SEED
+			SRL		GR7,4
+			AND		GR7,=#00FF
+			RET
+;----
+SEED		DC	#3643
+;----
+;----
+;----
+;----
+;**************************************
 ; プログラム終了
-;======================================
-		END
+;----
+;----
+;**************************************
+			END
