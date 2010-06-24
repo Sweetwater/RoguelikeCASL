@@ -3,7 +3,7 @@
 ;----
 ;----
 ;**************************************
-START	START
+START		START
 ;----
 ;----
 ;======================================
@@ -14,14 +14,15 @@ MAIN		NOP
 			;--------------------------------------
 			; 初期化処理
 			;--------------------------------------
-			; プレイヤーの座標初期化
-			LAD		GR0,5
-			ST		GR0,PLYX
-			LAD		GR0,5
-			ST		GR0,PLYY
 ;----
 			; 迷路の生成
 			CALL	MEZCRT
+;----
+			; 階段を設定
+			CALL	SETELV
+;----
+			; プレイヤーの設定
+			CALL	SETPLY
 ;----
 			; 画面の初期化
 			CALL	CLRSBUF
@@ -51,6 +52,8 @@ MAINL		NOP
 			;--------------------------------------
 			; プレイヤーの更新
 			CALL	UPDPLY
+			; 階段の判定
+			CALL	CHKELV
 ;----
 			;--------------------------------------
 			; 描画処理
@@ -83,6 +86,7 @@ PLYY		DS	1
 ; 文字キャラクタの定義
 PCHR		DC	'@'		; プレイヤーキャラクタ
 WCHR		DC	'#'		; 壁キャラクタ
+ECHR		DC	'z'		; 階段キャラクタ
 CCHR		DC	' '		; 空白キャラ
 ;----
 ; 画面バッファ
@@ -163,9 +167,74 @@ NUM1		DC	1
 ;----
 ;----
 ;======================================
+; 階段の設定
+;======================================
+SETELV		LD		GR7,ECHR
+			CALL	MEZRDPOK
+			RET
+;----
+;----
+;======================================
+; 階段の設定
+;======================================
+CHKELV		LD		GR0,INL
+			JZE		CHKELVED
+			LD		GR0,IN
+			LD		GR5,PLYX
+			LD		GR6,PLYY
+			CPA		GR0,='5'
+			JNZ		CHKELVED
+			CALL	MEZPEEK
+			CPA		GR7,ECHR
+			JNZ		CHKELVED
+;----
+			; 迷路の初期化
+			CALL	MEZCRT
+			CALL	SETELV
+			CALL	SETPLY
+;----
+CHKELVED	RET
+;----
+;----
+;======================================
+; プレイヤー座標の設定
+;======================================
+SETPLY		NOP
+			; 乱数を取得
+SETPLYL		CALL	RND
+			LD		GR5,GR7
+			CALL	RND
+			LD		GR6,GR7
+			; 乱数の範囲を制限
+			AND		GR5,PLYMSK
+			AND		GR6,PLYMSK
+			; 乱数にオフセットを加える
+			ADDA	GR5,PLYOFFX
+			ADDA	GR6,PLYOFFY
+			; 迷路のデータを取得し壁だったら
+			; もう一度ランダムを取得
+			CALL	MEZPEEK
+			CPA		GR7,WCHR
+			JZE		SETPLYL
+			; 座標を設定
+			ST		GR5,PLYX
+			ST		GR6,PLYY
+			RET
+;----
+PLYMSK		DC	#0007
+PLYOFFX		DC	4
+PLYOFFY		DC	2
+;----
+;----
+;======================================
 ; プレイヤーの更新
 ;======================================
-UPDPLY		LD		GR0,IN
+UPDPLY		LD		GR0,INL
+			JZE		UPDPLYED
+			LD		GR0,IN
+			LD		GR5,PLYX
+			LD		GR6,PLYY
+			; 入力によって移動方向を変える
 			CPA		GR0,='4'
 			JZE		UPDPLY4
 			CPA		GR0,='6'
@@ -176,25 +245,24 @@ UPDPLY		LD		GR0,IN
 			JZE		UPDPLY2
 			JUMP	UPDPLYED
 ;----
-UPDPLY4		LD		GR0,PLYX
-			SUBA	GR0,=1
-			ST		GR0,PLYX
-			JUMP	UPDPLYED
+UPDPLY4		SUBA	GR5,=1
+			JUMP	UPDPLYCH
 ;----
-UPDPLY6		LD		GR0,PLYX
-			ADDA	GR0,=1
-			ST		GR0,PLYX
-			JUMP	UPDPLYED
+UPDPLY6		ADDA	GR5,=1
+			JUMP	UPDPLYCH
 ;----
-UPDPLY8		LD		GR0,PLYY
-			SUBA	GR0,=1
-			ST		GR0,PLYY
-			JUMP	UPDPLYED
+UPDPLY8		SUBA	GR6,=1
+			JUMP	UPDPLYCH
 ;----
-UPDPLY2		LD		GR0,PLYY
-			ADDA	GR0,=1
-			ST		GR0,PLYY
-			JUMP	UPDPLYED
+UPDPLY2		ADDA	GR6,=1
+			JUMP	UPDPLYCH
+;----
+			; 移動先が壁だったら座標を設定しない
+UPDPLYCH	CALL	MEZPEEK
+			CPA		GR7,WCHR
+			JZE		UPDPLYED
+			ST		GR5,PLYX
+			ST		GR6,PLYY
 ;----
 UPDPLYED	RET
 ;----
@@ -224,7 +292,7 @@ DRWPLY		LD		GR1,PLYY
 ;======================================
 MEZCRT		CALL	MEZCLR
 ;----
-			LD		GR0,WALDAT
+			LD		GR0,WCHR
 ;----
 			; 外壁を埋める
 			; 上下壁
@@ -235,7 +303,7 @@ MEZCRTL0	SUBL	GR1,=1
 			JNZ		MEZCRTL0
 ;----
 			; 左右壁
-			LD		GR1,MESLNUM
+			LD		GR1,MEZLNUM
 			LAD		GR2,0
 MEZCRTL1	ST		GR0,MEZL00,GR2
 			ST		GR0,MEZL00R,GR2
@@ -251,7 +319,7 @@ MEZCRTL1	ST		GR0,MEZL00,GR2
 MEZCRTL2	NOP
 			; 既に壁があったら処理を飛ばす
 			LD		GR2,0,GR1
-			CPA		GR2,CLRDAT
+			CPA		GR2,CCHR
 			JNZ		MEZCRNX0
 ;----
 			; 壁を設定
@@ -263,7 +331,7 @@ RNDL0		CALL	RND
 			LD		GR7,PICH,GR7
 			ADDA	GR7,GR1
 			LD		GR2,0,GR7
-			CPA		GR2,CLRDAT
+			CPA		GR2,CCHR
 			JNZ		RNDL0
 ;----
 			; 棒倒し壁を設定
@@ -282,7 +350,7 @@ MEZCRTL4	NOP
 ;----
 			; 既に壁があったら処理を飛ばす
 			LD		GR3,0,GR1
-			CPA		GR3,CLRDAT
+			CPA		GR3,CCHR
 			JNZ		MEZCRNX1
 ;----
 			; 壁を設定
@@ -297,7 +365,7 @@ RNDL1		CALL	RND
 			LD		GR7,PICH,GR7
 			ADDA	GR7,GR1
 			LD		GR3,0,GR7
-			CPA		GR3,CLRDAT
+			CPA		GR3,CCHR
 			JNZ		RNDL1
 ;----
 			; 棒倒し壁を設定
@@ -317,20 +385,19 @@ MEZCRNX1	LAD		GR1,2,GR1
 ;----
 			RET
 ;----
-WALDAT		DC	'#'
 PICH		DC	 -31,-1,1,31
 ;----
 ;----
 ;======================================
 ; 迷路クリア
 ;======================================
-MEZCLR		LD		GR0,CLRDAT
+MEZCLR		LD		GR0,CCHR
 			LD		GR1,MEZDATSZ
 MEZCLRL		SUBL	GR1,=1
 			ST		GR0,MEZL00,GR1
 			JNZ		MEZCLRL
 			RET
-CLRDAT		DC	' '
+MEZCLRD		DC	' '
 ;----
 ;----
 ;======================================
@@ -352,12 +419,67 @@ MEZDRWL1	LD		GR0,0,GR3
 			JMI		MEZDRWL1
 ;----
 			LAD		GR1,1,GR1
-			CPA		GR1,MESLNUM
+			CPA		GR1,MEZLNUM
 			JMI		MEZDRWL0
 			RET
 ;----
-;CCHR		DC		' '
 ;----
+;======================================
+; 迷路のデータを取得
+; input  : GR5  X座標
+;          GR6  Y座標
+; return : GR7  データ
+;======================================
+MEZPEEK		LD		GR7,MEZDAT,GR6
+			ADDA	GR7,GR5
+			LD		GR7,0,GR7
+			RET
+;----
+;----
+;======================================
+; 迷路のデータを設定
+; input  : GR5  X座標
+;          GR6  Y座標
+;          GR7  データ
+; work   : GR4
+;======================================
+MEZPOKE		LD		GR4,MEZDAT,GR6
+			ADDA	GR4,GR5
+			ST		GR7,0,GR4
+			RET
+;----
+;----
+;======================================
+; 迷路のデータをランダム設定
+; input  : GR7  データ
+; return : GR5  X座標
+;          GR6  Y座標
+;======================================
+MEZRDPOK	PUSH	0,GR7
+			; 乱数を取得
+MEZRDPOL	CALL	RND
+			LD		GR5,GR7
+			CALL	RND
+			LD		GR6,GR7
+			; 乱数の範囲を制限
+			AND		GR5,=#001F
+			AND		GR6,=#000F
+			; 範囲外だったらもう一度ランダムを取得
+			CPA		GR5,MEZLLEN
+			JPL		MEZRDPOL
+			JZE		MEZRDPOL
+			CPA		GR6,MEZLNUM
+			JPL		MEZRDPOL
+			JZE		MEZRDPOL
+			; 迷路のデータを取得し壁だったら
+			; もう一度ランダムを取得
+			CALL	MEZPEEK
+			CPA		GR7,CCHR
+			JNZ		MEZRDPOL
+			; 座標を設定
+			POP		GR7
+			CALL	MEZPOKE
+			RET
 ;----
 ;----
 ;======================================
@@ -382,7 +504,7 @@ MEZDAT1		DC	MEZL05,MEZL06,MEZL07,MEZL08,MEZL09
 MEZDAT2		DC	MEZL10,MEZL11,MEZL12
 ;----
 MEZLLEN		DC	31
-MESLNUM		DC	13
+MEZLNUM		DC	13
 MEZDATSZ	DC	403
 ;----
 ; 一段目の開始アドレスと終了アドレス
@@ -392,8 +514,6 @@ MEZEND0		DC	MEZL03
 ; 二段目以降の開始アドレスと終了アドレス
 MEZSTR1		DC	MEZL04
 MEZEND1		DC	MEZL11
-;----
-;NUM1		DC	1
 ;----
 ;----
 ;----
@@ -407,6 +527,9 @@ MEZEND1		DC	MEZL11
 ;----
 ;======================================
 ; ランダム関数
+; input  : なし
+; return : GR7   乱数
+; work   : GR6
 ;======================================
 RND			LD		GR7,SEED
 			LD		GR6,GR7
