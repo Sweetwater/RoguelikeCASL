@@ -10,7 +10,6 @@ START		START
 ; メインプログラム
 ;======================================
 MAIN		NOP
-;----
 			;--------------------------------------
 			; 初期化処理
 			;--------------------------------------
@@ -22,6 +21,8 @@ MAIN		NOP
 			CALL	SETELV
 ;----
 			; プレイヤーの設定
+			LD		GR0,PLYHPF
+			ST		GR0,PLYHP
 			CALL	SETPLY
 ;----
 			; 画面の初期化
@@ -78,10 +79,20 @@ MAINED		RET
 ; 入力バッファ
 IN			DS	8
 INL			DS	1
+; ワークバッファ
+WORKBUF		DS	10
 ;----
 ; プレイヤー情報
 PLYX		DS	1
 PLYY		DS	1
+PLYHP		DS	1
+PLYHPF		DC	20			; HP初期値
+PLYHPD		DC	3			; HP表示桁
+PLYHPX0		DC	32			; HP表示X座標
+PLYHPX1		DC	35			; HP表示X座標
+PLYHPY0		DC	2			; HP表示Y座標
+PLYHPY1		DC	2			; HP表示Y座標
+SCRHP		DC	'HP:'
 ;----
 ; 文字キャラクタの定義
 PCHR		DC	'@'		; プレイヤーキャラクタ
@@ -116,7 +127,7 @@ LINENUM		DC	15		; 画面ラインの数
 ;======================================
 ; 画面バッファのクリア
 ;======================================
-CLRSBUF		LD		GR4,WCHR
+CLRSBUF		LD		GR4,CCHR
 			LAD		GR5,0
 ;----
 		; 画面ラインの数分ループ		
@@ -134,6 +145,33 @@ CLRSBL1		ST		GR4,SCRL00,GR5
 			LAD		GR1,1,GR1
 			CPA		GR1,LINENUM
 			JNZ		CLRSBL0
+			RET
+;----
+;----
+;======================================
+; 画面バッファへコピー
+; input : GR1  アドレス  壊す
+;         GR2  X座標     壊す
+;         GR3  Y座標     壊す
+;         GR4  幅        壊す
+;         GR5  高さ      壊す
+;======================================
+CPYSBUF		NOP
+;----
+CPYSBUF0	LD		GR7,SCRBUF,GR3
+			ADDL	GR7,GR2
+;----
+CPYSBUF1	LD		GR6,0,GR1
+			ST		GR6,0,GR7
+			LAD		GR7,1,GR7
+			LAD		GR1,1,GR1
+;----
+			SUBA	GR4,=1
+			JNZ		CPYSBUF1
+;----
+			LAD		GR3,1,GR3
+			SUBA	GR5,=1
+			JNZ		CPYSBUF0
 			RET
 ;----
 ;----
@@ -270,14 +308,37 @@ UPDPLYED	RET
 ;======================================
 ; プレイヤーの描画
 ;======================================
-DRWPLY		LD		GR1,PLYY
+DRWPLY		NOP
+			; プレイヤーを画面に表示
+			LD		GR1,PLYY
 			LD		GR2,SCRBUF,GR1
 			ADDL	GR2,PLYX
 			LD		GR0,PCHR
 			ST		GR0,0,GR2
+;----
+			; HPを文字列に変換
+			LD		GR0,PLYHP
+			LD		GR1,PLYHPD
+			LAD		GR2,WORKBUF
+			LAD		GR3,0
+			CALL	DECCNV
+;----
+			; 'HP:'の表示
+			LAD		GR1,SCRHP
+			LD		GR2,PLYHPX0
+			LD		GR3,PLYHPY0
+			LD		GR4,PLYHPD
+			LAD		GR5,1
+			CALL	CPYSBUF
+;----
+			; HPの表示
+			LAD		GR1,WORKBUF
+			LD		GR2,PLYHPX1
+			LD		GR3,PLYHPY1
+			LD		GR4,PLYHPD
+			LAD		GR5,1
+			CALL	CPYSBUF
 			RET
-;----
-;----
 ;----
 ;----
 ;**************************************
@@ -523,6 +584,69 @@ MEZEND1		DC	MEZL11
 ;----
 ;----
 ;**************************************
+;----
+;----
+;======================================
+; 10進数変換関数
+; input  : GR0   数値
+;        : GR1   桁数 最大5桁
+;        : GR2   格納アドレス
+;        : GR3   0:ゼロサプレス,1:ゼロ埋め
+;======================================
+DECCNV		NOP
+			; 桁数を退避
+			PUSH	0,GR1
+			; 格納アドレスを退避
+			PUSH	0,GR2
+			; 桁数から処理回数を設定
+			LD		GR6,MAXDIGIT
+			SUBL	GR6,GR1
+			; 数値を初期化
+			LD		GR4,GR0
+;----
+DECCNV0		LAD		GR5,0
+DECCNV1		CPL		GR4,DIGIT,GR6
+			JMI		DECCNV1E
+;----
+			SUBL	GR4,DIGIT,GR6
+			LAD		GR5,1,GR5
+			JUMP	DECCNV1
+;----
+DECCNV1E	LD		GR7,NUMCHR,GR5
+			ST		GR7,0,GR2
+			LAD		GR2,1,GR2
+			LAD		GR6,1,GR6
+;----
+			CPL		GR6,MAXDIGIT
+			JNZ		DECCNV0
+;----
+			; ゼロサプレス処理
+			POP		GR2
+			POP		GR1
+			OR		GR3,GR3
+			JNZ		DECCNVED
+;----
+DECCNV2		LD		GR7,0,GR2
+			CPA		GR7,NUMCHR
+			JNZ		DECCNVED
+;----
+			SUBL	GR1,=1
+			JZE		DECCNVED
+;----
+			LD		GR6,PRSSCHR
+			ST		GR6,0,GR2
+			LAD		GR2,1,GR2
+			JUMP	DECCNV2
+;----
+DECCNVED	RET
+;----
+;----
+PRSSCHR		DC	' '
+NUMCHR		DC	'0','1','2','3','4'
+NUMCHR2		DC	'5','6','7','8','9'
+DIGIT		DC	10000,1000,100,10,1
+MAXDIGIT	DC	5
+DIGLOPNM	DC	4
 ;----
 ;----
 ;======================================
