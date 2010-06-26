@@ -14,16 +14,14 @@ MAIN		NOP
 			; 初期化処理
 			;--------------------------------------
 ;----
-			; 迷路の生成
-			CALL	MEZCRT
-;----
-			; 階段を設定
-			CALL	SETELV
-;----
-			; プレイヤーの設定
+			; プレイヤーのHP設定
 			LD		GR0,PLYHPF
 			ST		GR0,PLYHP
-			CALL	SETPLY
+;----
+			; 00ステートを設定
+			LAD		GR1,0
+			LD		GR1,CHNGTBL,GR1
+			CALL	0,GR1
 ;----
 			; 画面の初期化
 			CALL	CLRSBUF
@@ -36,33 +34,27 @@ MAIN		NOP
 			;======================================
 MAINL		NOP
 ;----
-			;--------------------------------------
-			; 入力処理
-			;--------------------------------------
-			IN		IN,INL
+			CALL	INPUT		; 入力処理
 ;----
 			;--------------------------------------
 			; 終了判定
 			;--------------------------------------
-			LD		GR0,IN
+			LD		GR0,INBUF
 			CPA		GR0,='E'
 			JZE		MAINED
 ;----
-			;--------------------------------------
-			; 更新処理
-			;--------------------------------------
-			; プレイヤーの更新
-			CALL	UPDPLY
-			; 階段の判定
-			CALL	CHKELV
+; !!!!!!!!!!!!!! デバッグ更新処理 !!!!!!!!!!!!!!
+			CALL	UPDDBG
 ;----
-			;--------------------------------------
+			; 更新処理
+			LD		GR1,STATE
+			LD		GR1,UPDTBL,GR1
+			CALL	0,GR1
+;----
 			; 描画処理
-			;--------------------------------------
-			CALL	CLRSBUF			; 画面バッファのクリア
-			CALL	MEZDRW			; 迷路の描画
-			CALL	DRWPLY			; プレイヤーの描画
-			CALL	DRWSBUF			; 画面バッファの描画
+			LD		GR1,STATE
+			LD		GR1,DRWTBL,GR1
+			CALL	0,GR1
 ;----
 			;======================================
 			; メインプループ終了
@@ -76,9 +68,19 @@ MAINED		RET
 ;======================================
 ; メインプログラムデータ
 ;======================================
+; ステート
+STATE		DS	1			; メインステート
+STATESUB	DS	1			; サブステート
+; ステート変更テーブル
+CHNGTBL		DC	CHNG00,CHNG01
+; 更新テーブル
+UPDTBL		DC	UPD00,UPD01
+; 描画テーブル
+DRWTBL		DC	DRW00,DRW01
+;----
 ; 入力バッファ
-IN			DS	8
-INL			DS	1
+INBUF		DS	8
+INBUFL		DS	1
 ; ワークバッファ
 WORKBUF		DS	10
 ;----
@@ -93,6 +95,10 @@ PLYHPX1		DC	35			; HP表示X座標
 PLYHPY0		DC	2			; HP表示Y座標
 PLYHPY1		DC	2			; HP表示Y座標
 SCRHP		DC	'HP:'
+;----
+; マップ情報
+ELVX		DS	1			; 階段X座標
+ELVY		DS	1			; 階段Y座標
 ;----
 ; 文字キャラクタの定義
 PCHR		DC	'@'		; プレイヤーキャラクタ
@@ -116,18 +122,148 @@ SCRL11		DS	40
 SCRL12		DS	40
 SCRL13		DS	40
 SCRL14		DS	40
+SCRL15		DS	40
+SCRL16		DS	40
 SCRBUF		DC	SCRL00,SCRL01,SCRL02,SCRL03,SCRL04
 SCRBUF1		DC	SCRL05,SCRL06,SCRL07,SCRL08,SCRL09
 SCRBUF2		DC	SCRL10,SCRL11,SCRL12,SCRL13,SCRL14
+SCRBUF3		DC	SCRL15,SCRL16
 ;----
 LINELEN		DC	40		; 画面ラインの長さ
-LINENUM		DC	15		; 画面ラインの数
+LINENUM		DC	17		; 画面ラインの数
+;----
+SCRMSGX		DC	2		; メッセージX座標
+SCRMSGY1	DC	14		; メッセージY1座標
+SCRMSGY2	DC	15		; メッセージY2座標
+MSGLEN		DC	38		; メッセージの長さ
+;----
+;======================================
+; 入力処理
+;======================================
+INPUT		IN		INBUF,INBUFL
+			RET
+;----
+;----
+;======================================
+; デバッグ処理
+;======================================
+UPDDBG		LD		GR0,INBUFL
+			JZE		UPDDBGE
+;----
+			LD		GR0,INBUF
+			CPA		GR0,='a'
+			JZE		UPDDBGAA
+			JUMP	UPDDBGE
+;----
+			; プレイヤーを階段に移動
+UPDDBGAA	LD		GR0,ELVX
+			ST		GR0,PLYX
+			LD		GR0,ELVY
+			ST		GR0,PLYY
+			JUMP	UPDDBGE
+;----
+UPDDBGE		RET
+;----
+;----
+;======================================
+; 00迷路移動中の処理
+;======================================
+;--------------------------------------
+; 00変更
+;--------------------------------------
+CHNG00		CALL	MEZCRT			; 迷路の生成
+			CALL	SETELV			; 階段を設定
+			CALL	SETPLY			; プレイヤーの設定
+			LAD		GR0,0			; ステートを00に変更
+			ST		GR0,STATE
+			RET
+;----
+;----
+;--------------------------------------
+; 00更新
+;--------------------------------------
+UPD00		CALL	UPDPLY
+			CALL	CHKELV
+			; 階段を降りていたらステートを変更
+			OR		GR0,GR0
+			JZE		UPD00ED
+;----
+BRK			CALL	CHNG01
+;----
+UPD00ED		RET
+;----
+;----
+;--------------------------------------
+; 00描画
+;--------------------------------------
+DRW00		CALL	CLRSBUF			; 画面バッファのクリア
+			CALL	MEZDRW			; 迷路の描画
+			CALL	DRWPLY			; プレイヤーの描画
+			CALL	DRWSBUF			; 画面バッファの描画
+			RET
+;----
+;----
+;----
+;----
+;======================================
+; 01階段降り中へ処理
+;======================================
+;--------------------------------------
+; 01変更
+;--------------------------------------
+CHNG01		NOP
+			; ステートを01に変更
+			LAD		GR0,1
+			ST		GR0,STATE
+			LAD		GR0,0
+			ST		GR0,STATESUB
+			RET
+;----
+;--------------------------------------
+; 01更新
+;--------------------------------------
+UPD01		NOP
+			; サブステートを加算
+			LD		GR1,STATESUB
+			LAD		GR1,1,GR1
+			ST		GR1,STATESUB
+			CPA		GR1,=3
+			JNZ		UPD01E
+;----
+			CALL	CHNG00
+;----
+UPD01E		RET
+;----
+;--------------------------------------
+; 01描画
+;--------------------------------------
+DRW01		CALL	CLRSBUF			; 画面バッファのクリア
+;			CALL	MEZDRW			; 迷路の描画
+;----
+			; サブステート事にメッセージを表示
+BRK3		LD		GR2,STATESUB
+			LD		GR1,MSG01,GR2
+			LD		GR4,MSG01L,GR2
+			CALL	CPYMSG1
+;----
+			CALL	DRWSBUF			; 画面バッファの描画
+BRK2		RET
+;----
+MSG010		DC	'階段を下りた'
+MSG011		DC	'階段を下りた…'
+MSG012		DC	'階段を下りた……'
+MSG01		DC	MSG010,MSG011,MSG012
+MSG01L		DC	12,14,16
+;----
+;----
 ;----
 ;----
 ;======================================
 ; 画面バッファのクリア
 ;======================================
-CLRSBUF		LD		GR4,CCHR
+CLRSBUF		NOP
+;			LD		GR4,CCHR
+			LD		GR4,='-'
 			LAD		GR5,0
 ;----
 		; 画面ラインの数分ループ		
@@ -176,6 +312,30 @@ CPYSBUF1	LD		GR6,0,GR1
 ;----
 ;----
 ;======================================
+; メッセージ領域1へコピー
+; input : GR1  アドレス  壊す
+;         GR4  幅        壊す
+;======================================
+CPYMSG1		LD		GR2,SCRMSGX
+			LD		GR3,SCRMSGY1
+			LAD		GR5,1
+			CALL	CPYSBUF
+			RET
+;----
+;----
+;======================================
+; メッセージ領域2へコピー
+; input : GR1  アドレス  壊す
+;         GR4  幅        壊す
+;======================================
+CPYMSG2		LD		GR2,SCRMSGX
+			LD		GR3,SCRMSGY2
+			LAD		GR5,1
+			CALL	CPYSBUF
+			RET
+;----
+;----
+;======================================
 ; 画面バッファの描画
 ;======================================
 DRWSBUF		OUT		CCHR,NUM1
@@ -195,8 +355,8 @@ DRWSBUF		OUT		CCHR,NUM1
 			OUT		SCRL12,LINELEN
 			OUT		SCRL13,LINELEN
 			OUT		SCRL14,LINELEN
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
+			OUT		SCRL15,LINELEN
+			OUT		SCRL16,LINELEN
 			OUT		CCHR,NUM1
 			OUT		CCHR,NUM1
 			RET
@@ -209,27 +369,30 @@ NUM1		DC	1
 ;======================================
 SETELV		LD		GR7,ECHR
 			CALL	MEZRDPOK
+			ST		GR5,ELVX
+			ST		GR6,ELVY
 			RET
 ;----
 ;----
 ;======================================
-; 階段の設定
+; 階段の判定
+; return :  GR0  0:階段なし  1:階段降り
 ;======================================
-CHKELV		LD		GR0,INL
+CHKELV		LAD		GR0,0
+			LD		GR1,INBUFL
 			JZE		CHKELVED
-			LD		GR0,IN
+;----
+			LD		GR1,INBUF
+			CPA		GR1,='5'
+			JNZ		CHKELVED
+;----
 			LD		GR5,PLYX
 			LD		GR6,PLYY
-			CPA		GR0,='5'
-			JNZ		CHKELVED
 			CALL	MEZPEEK
 			CPA		GR7,ECHR
 			JNZ		CHKELVED
 ;----
-			; 迷路の初期化
-			CALL	MEZCRT
-			CALL	SETELV
-			CALL	SETPLY
+			LAD		GR0,1
 ;----
 CHKELVED	RET
 ;----
@@ -267,9 +430,9 @@ PLYOFFY		DC	2
 ;======================================
 ; プレイヤーの更新
 ;======================================
-UPDPLY		LD		GR0,INL
+UPDPLY		LD		GR0,INBUFL
 			JZE		UPDPLYED
-			LD		GR0,IN
+			LD		GR0,INBUF
 			LD		GR5,PLYX
 			LD		GR6,PLYY
 			; 入力によって移動方向を変える
