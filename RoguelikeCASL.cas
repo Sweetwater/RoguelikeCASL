@@ -2,9 +2,7 @@
 ; プログラム開始
 ;----
 ;----
-;**************************************
 START		START
-;----
 ;----
 ;======================================
 ; メインプログラム
@@ -13,6 +11,10 @@ MAIN		NOP
 			;--------------------------------------
 			; 初期化処理
 			;--------------------------------------
+;----
+			; 階数の初期化
+			LAD		GR0,1
+			ST		GR0,ELVNUM
 ;----
 			; プレイヤーのHP設定
 			LD		GR0,PLYHPF
@@ -23,11 +25,10 @@ MAIN		NOP
 			LD		GR1,CHNGTBL,GR1
 			CALL	0,GR1
 ;----
-			; 画面の初期化
-			CALL	CLRSBUF
-			CALL	MEZDRW
-			CALL	DRWPLY
-			CALL	DRWSBUF
+			; 初期画面の描画
+			LD		GR1,STATE
+			LD		GR1,DRWTBL,GR1
+			CALL	0,GR1
 ;----
 			;======================================
 			; メインプループ
@@ -44,7 +45,7 @@ MAINL		NOP
 			JZE		MAINED
 ;----
 ; !!!!!!!!!!!!!! デバッグ更新処理 !!!!!!!!!!!!!!
-			CALL	UPDDBG
+			CALL	DBGUPD
 ;----
 			; 更新処理
 			LD		GR1,STATE
@@ -64,10 +65,10 @@ MAINL		NOP
 MAINED		RET
 ;----
 ;----
-;----
-;======================================
+;**************************************
 ; メインプログラムデータ
-;======================================
+;----
+;----
 ; ステート
 STATE		DS	1			; メインステート
 STATESUB	DS	1			; サブステート
@@ -89,22 +90,62 @@ PLYX		DS	1
 PLYY		DS	1
 PLYHP		DS	1
 PLYHPF		DC	20			; HP初期値
-PLYHPD		DC	3			; HP表示桁
-PLYHPX0		DC	32			; HP表示X座標
-PLYHPX1		DC	35			; HP表示X座標
-PLYHPY0		DC	2			; HP表示Y座標
-PLYHPY1		DC	2			; HP表示Y座標
-SCRHP		DC	'HP:'
+;----
+; 階数情報
+ELVNUM		DS	1
+;----
+; HUD情報
+HUDHPD		DC	3			; HP表示桁
+HUDHPX0		DC	32			; HP表示0X座標
+HUDHPX1		DC	35			; HP表示1X座標
+HUDHPY		DC	2			; HP表示Y座標
+HUDHP		DC	'HP:'
+;----
+HUDFLRD		DC	3			; 階数表示桁数
+HUDFLRX0	DC	34			; 階数表0X座標
+HUDFLRX1	DC	37			; 階数表1X座標
+HUDFLRY		DC	1			; 階数表Y座標
+HUDFLR		DC	'F'
 ;----
 ; マップ情報
 ELVX		DS	1			; 階段X座標
 ELVY		DS	1			; 階段Y座標
 ;----
 ; 文字キャラクタの定義
-PCHR		DC	'@'		; プレイヤーキャラクタ
-WCHR		DC	'#'		; 壁キャラクタ
-ECHR		DC	'z'		; 階段キャラクタ
-CCHR		DC	' '		; 空白キャラ
+CHRPLY		DC	'@'			; プレイヤーキャラクタ
+CHRWAL		DC	'#'			; 壁キャラクタ
+CHRELV		DC	'z'			; 階段キャラクタ
+CLRCHR		DC	' '			; 空白キャラ
+CHREMY		DC	'a'			; 敵キャラ
+;----
+; マップデータ
+MSKWAL		DC	#8000
+MSKELV		DC	#4000
+MSKEMY		DC	#0F00
+MSKITM		DC	#00F0
+MSKPLY		DC	#0001
+MAPDAT00	DS	32
+MAPDAT01	DS	32
+MAPDAT02	DS	32
+MAPDAT03	DS	32
+MAPDAT04	DS	32
+MAPDAT05	DS	32
+MAPDAT06	DS	32
+MAPDAT07	DS	32
+MAPDAT08	DS	32
+MAPDAT09	DS	32
+MAPDAT10	DS	32
+MAPDAT11	DS	32
+MAPDAT12	DS	32
+MAPDAT13	DS	32
+MAPDAT14	DS	32
+MAPDAT15	DS	32
+MAPDATA		DC	MAPDAT00,MAPDAT01,MAPDAT02,MAPDAT03
+MAPDATA1	DC	MAPDAT04,MAPDAT05,MAPDAT06,MAPDAT07
+MAPDATA2	DC	MAPDAT08,MAPDAT09,MAPDAT10,MAPDAT11
+MAPDATA3	DC	MAPDAT12,MAPDAT13,MAPDAT14,MAPDAT15
+MAPDATL		DC	32
+MAPDATNM	DC	16
 ;----
 ; 画面バッファ
 SCRL00		DS	40
@@ -135,45 +176,52 @@ LINENUM		DC	17		; 画面ラインの数
 SCRMSGX		DC	2		; メッセージX座標
 SCRMSGY1	DC	14		; メッセージY1座標
 SCRMSGY2	DC	15		; メッセージY2座標
-MSGLEN		DC	38		; メッセージの長さ
+SCRMSGL		DC	38		; メッセージの長さ
 ;----
-;======================================
+;----
+;**************************************
 ; 入力処理
-;======================================
+;----
+;----
 INPUT		IN		INBUF,INBUFL
 			RET
 ;----
 ;----
-;======================================
+;**************************************
 ; デバッグ処理
-;======================================
-UPDDBG		LD		GR0,INBUFL
-			JZE		UPDDBGE
+;----
+;----
+DBGUPD		LD		GR0,INBUFL
+			JZE		DBGUPDE
 ;----
 			LD		GR0,INBUF
 			CPA		GR0,='a'
-			JZE		UPDDBGAA
-			JUMP	UPDDBGE
+			JZE		DBGUPDAA
+			JUMP	DBGUPDE
 ;----
 			; プレイヤーを階段に移動
-UPDDBGAA	LD		GR0,ELVX
+DBGUPDAA	LD		GR0,ELVX
 			ST		GR0,PLYX
 			LD		GR0,ELVY
 			ST		GR0,PLYY
-			JUMP	UPDDBGE
+			JUMP	DBGUPDE
 ;----
-UPDDBGE		RET
+DBGUPDE		RET
 ;----
 ;----
-;======================================
+;**************************************
 ; 00迷路移動中の処理
-;======================================
+;----
+;----
 ;--------------------------------------
 ; 00変更
 ;--------------------------------------
 CHNG00		CALL	MEZCRT			; 迷路の生成
-			CALL	SETELV			; 階段を設定
-			CALL	SETPLY			; プレイヤーの設定
+			CALL	MAPCLR			; マップデータをクリア
+			CALL	MAPMEZ			; 迷路データをマップデータに設定
+			CALL	ELVSET			; 階段を設定
+			CALL	EMYSET			; 敵を設定
+			CALL	PLYSET			; プレイヤーの設定
 			LAD		GR0,0			; ステートを00に変更
 			ST		GR0,STATE
 			RET
@@ -182,13 +230,13 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 ;--------------------------------------
 ; 00更新
 ;--------------------------------------
-UPD00		CALL	UPDPLY
-			CALL	CHKELV
+UPD00		CALL	PLYUPD
+			CALL	ELVCHK
 			; 階段を降りていたらステートを変更
 			OR		GR0,GR0
 			JZE		UPD00ED
 ;----
-BRK			CALL	CHNG01
+			CALL	CHNG01
 ;----
 UPD00ED		RET
 ;----
@@ -196,58 +244,61 @@ UPD00ED		RET
 ;--------------------------------------
 ; 00描画
 ;--------------------------------------
-DRW00		CALL	CLRSBUF			; 画面バッファのクリア
+DRW00		CALL	SBUFCLR			; 画面バッファのクリア
 			CALL	MEZDRW			; 迷路の描画
-			CALL	DRWPLY			; プレイヤーの描画
+			CALL	ELVDRW			; 階段の描画
+			CALL	HUDDRW			; HUDの描画
+			CALL	PLYDRW			; プレイヤーの描画
+			CALL	EMYDRW			; 敵の描画
 			CALL	DRWSBUF			; 画面バッファの描画
 			RET
 ;----
 ;----
-;----
-;----
-;======================================
+;**************************************
 ; 01階段降り中へ処理
-;======================================
+;----
+;----
 ;--------------------------------------
 ; 01変更
 ;--------------------------------------
-CHNG01		NOP
-			; ステートを01に変更
-			LAD		GR0,1
+CHNG01		LAD		GR0,1
 			ST		GR0,STATE
 			LAD		GR0,0
 			ST		GR0,STATESUB
 			RET
 ;----
+;----
 ;--------------------------------------
 ; 01更新
 ;--------------------------------------
-UPD01		NOP
-			; サブステートを加算
-			LD		GR1,STATESUB
+UPD01		LD		GR1,STATESUB
 			LAD		GR1,1,GR1
 			ST		GR1,STATESUB
 			CPA		GR1,=3
 			JNZ		UPD01E
 ;----
+			; 階数をインクリメント
+			LD		GR1,ELVNUM
+			LAD		GR1,1,GR1
+			ST		GR1,ELVNUM
 			CALL	CHNG00
 ;----
 UPD01E		RET
 ;----
+;----
 ;--------------------------------------
 ; 01描画
 ;--------------------------------------
-DRW01		CALL	CLRSBUF			; 画面バッファのクリア
-;			CALL	MEZDRW			; 迷路の描画
+DRW01		CALL	SBUFCLR			; 画面バッファのクリア
 ;----
 			; サブステート事にメッセージを表示
-BRK3		LD		GR2,STATESUB
+			LD		GR2,STATESUB
 			LD		GR1,MSG01,GR2
 			LD		GR4,MSG01L,GR2
 			CALL	CPYMSG1
 ;----
 			CALL	DRWSBUF			; 画面バッファの描画
-BRK2		RET
+			RET
 ;----
 MSG010		DC	'階段を下りた'
 MSG011		DC	'階段を下りた…'
@@ -256,31 +307,33 @@ MSG01		DC	MSG010,MSG011,MSG012
 MSG01L		DC	12,14,16
 ;----
 ;----
+;**************************************
+;  画面バッファプログラム
 ;----
 ;----
 ;======================================
 ; 画面バッファのクリア
 ;======================================
-CLRSBUF		NOP
-;			LD		GR4,CCHR
+SBUFCLR		NOP
+;			LD		GR4,CLRCHR
 			LD		GR4,='-'
 			LAD		GR5,0
 ;----
 		; 画面ラインの数分ループ		
 			LAD		GR1,0
-CLRSBL0		NOP
+SBUFCLR0	NOP
 ;----
 		; 画面ラインの長さ分ループ		
 			LAD		GR2,0
-CLRSBL1		ST		GR4,SCRL00,GR5
+SBUFCLR1	ST		GR4,SCRL00,GR5
 			LAD		GR5,1,GR5
 			LAD		GR2,1,GR2
 			CPA		GR2,LINELEN
-			JNZ		CLRSBL1
+			JNZ		SBUFCLR1
 ;----
 			LAD		GR1,1,GR1
 			CPA		GR1,LINENUM
-			JNZ		CLRSBL0
+			JNZ		SBUFCLR0
 			RET
 ;----
 ;----
@@ -312,6 +365,18 @@ CPYSBUF1	LD		GR6,0,GR1
 ;----
 ;----
 ;======================================
+; 画面バッファに一文字描画
+; input :  GR0  文字
+;          GR5  X座標
+;          GR6  Y座標
+;======================================
+PUTSBUF		LD		GR7,SCRBUF,GR6
+			ADDL	GR7,GR5
+			ST		GR0,0,GR7
+			RET
+;----
+;----
+;======================================
 ; メッセージ領域1へコピー
 ; input : GR1  アドレス  壊す
 ;         GR4  幅        壊す
@@ -338,8 +403,8 @@ CPYMSG2		LD		GR2,SCRMSGX
 ;======================================
 ; 画面バッファの描画
 ;======================================
-DRWSBUF		OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
+DRWSBUF		OUT		CLRCHR,NUM1
+			OUT		CLRCHR,NUM1
 			OUT		SCRL00,LINELEN
 			OUT		SCRL01,LINELEN
 			OUT		SCRL02,LINELEN
@@ -357,20 +422,90 @@ DRWSBUF		OUT		CCHR,NUM1
 			OUT		SCRL14,LINELEN
 			OUT		SCRL15,LINELEN
 			OUT		SCRL16,LINELEN
-			OUT		CCHR,NUM1
-			OUT		CCHR,NUM1
+			OUT		CLRCHR,NUM1
+			OUT		CLRCHR,NUM1
 			RET
 ;----
 NUM1		DC	1
 ;----
 ;----
+;**************************************
+;  HUDプログラム
+;----
+;----
+;======================================
+;  HUDの描画
+;======================================
+HUDDRW		NOP
+			; HPを文字列に変換
+			LD		GR0,PLYHP
+			LD		GR1,HUDHPD
+			LAD		GR2,WORKBUF
+			LAD		GR3,0
+			CALL	DECCNV
+;----
+			; 'HP:'の表示
+			LAD		GR1,HUDHP
+			LD		GR2,HUDHPX0
+			LD		GR3,HUDHPY
+			LD		GR4,HUDHPD
+			LAD		GR5,1
+			CALL	CPYSBUF
+;----
+			; HPの表示
+			LAD		GR1,WORKBUF
+			LD		GR2,HUDHPX1
+			LD		GR3,HUDHPY
+			LD		GR4,HUDHPD
+			LAD		GR5,1
+			CALL	CPYSBUF
+;----
+			; 階数を文字列に変換
+			LD		GR0,ELVNUM
+			LD		GR1,HUDFLRD
+			LAD		GR2,WORKBUF
+			LAD		GR3,0
+			CALL	DECCNV
+;----
+			; 階数の表示
+			LAD		GR1,WORKBUF
+			LD		GR2,HUDFLRX0
+			LD		GR3,HUDFLRY
+			LD		GR4,HUDFLRD
+			LAD		GR5,1
+			CALL	CPYSBUF
+;----
+			; 'F'の表示
+			LAD		GR1,HUDFLR
+			LD		GR2,HUDFLRX1
+			LD		GR3,HUDFLRY
+			LAD		GR4,1
+			LAD		GR5,1
+			CALL	CPYSBUF
+			RET
+;----
+;----
+;**************************************
+;  階段プログラム
+;----
+;----
 ;======================================
 ; 階段の設定
 ;======================================
-SETELV		LD		GR7,ECHR
-			CALL	MEZRDPOK
+ELVSET		LD		GR0,MSKELV
+			CALL	MAPRDADD
 			ST		GR5,ELVX
 			ST		GR6,ELVY
+			RET
+;----
+;----
+;======================================
+; 階段の描画
+;======================================
+ELVDRW		LD		GR0,CHRELV
+			LD		GR5,ELVX
+			LD		GR6,ELVY
+			CALL	PUTSBUF
 			RET
 ;----
 ;----
@@ -378,31 +513,75 @@ SETELV		LD		GR7,ECHR
 ; 階段の判定
 ; return :  GR0  0:階段なし  1:階段降り
 ;======================================
-CHKELV		LAD		GR0,0
+ELVCHK		LAD		GR0,0
 			LD		GR1,INBUFL
-			JZE		CHKELVED
+			JZE		ELVCHKED
 ;----
 			LD		GR1,INBUF
 			CPA		GR1,='5'
-			JNZ		CHKELVED
+			JNZ		ELVCHKED
 ;----
 			LD		GR5,PLYX
 			LD		GR6,PLYY
-			CALL	MEZPEEK
-			CPA		GR7,ECHR
-			JNZ		CHKELVED
+			CALL	MAPPEEK
+			AND		GR7,MSKELV
+			JZE		ELVCHKED
 ;----
 			LAD		GR0,1
 ;----
-CHKELVED	RET
+ELVCHKED	RET
+;----
+;----
+;**************************************
+;  敵プログラム
+;----
+;----
+;======================================
+;  敵座標の設定
+;======================================
+EMYSET		NOP
+			LAD		GR1,0
+;----
+EMYSET0		LD		GR0,MSKEMY
+			CALL	MAPRDADD
+			ST		GR5,EMYX,GR1
+			ST		GR6,EMYY,GR1
+			LAD		GR1,1,GR1
+			CPA		GR1,EMYNUM
+			JNZ		EMYSET0
+			RET
+;----
+EMYNUM		DC		5
+EMYX		DS		5
+EMYY		DS		5
+;----
+;----
+;======================================
+;  敵の描画
+;======================================
+EMYDRW		NOP
+			LAD		GR1,0
+			LD		GR0,CHREMY
+;----
+EMYDRW0		LD		GR5,EMYX,GR1
+			LD		GR6,EMYY,GR1
+			CALL	PUTSBUF
+			LAD		GR1,1,GR1
+			CPA		GR1,EMYNUM
+			JNZ		EMYDRW0
+			RET
+;----
+;----
+;**************************************
+;  プレイヤープログラム
 ;----
 ;----
 ;======================================
 ; プレイヤー座標の設定
 ;======================================
-SETPLY		NOP
+PLYSET		NOP
 			; 乱数を取得
-SETPLYL		CALL	RND
+PLYSETL		CALL	RND
 			LD		GR5,GR7
 			CALL	RND
 			LD		GR6,GR7
@@ -414,12 +593,14 @@ SETPLYL		CALL	RND
 			ADDA	GR6,PLYOFFY
 			; 迷路のデータを取得し壁だったら
 			; もう一度ランダムを取得
-			CALL	MEZPEEK
-			CPA		GR7,WCHR
-			JZE		SETPLYL
+			CALL	MAPPEEK
+			OR		GR7,GR7
+			JNZ		PLYSETL
 			; 座標を設定
 			ST		GR5,PLYX
 			ST		GR6,PLYY
+			LD		GR0,MSKPLY
+			CALL	MAPADD
 			RET
 ;----
 PLYMSK		DC	#0007
@@ -430,77 +611,191 @@ PLYOFFY		DC	2
 ;======================================
 ; プレイヤーの更新
 ;======================================
-UPDPLY		LD		GR0,INBUFL
-			JZE		UPDPLYED
-			LD		GR0,INBUF
+PLYUPD		LD		GR0,INBUFL
+			JZE		PLYUPDED
+			; マップデータを消去
+			LD		GR0,MSKPLY
 			LD		GR5,PLYX
 			LD		GR6,PLYY
+			CALL	MAPRMV
 			; 入力によって移動方向を変える
+			LD		GR0,INBUF
 			CPA		GR0,='4'
-			JZE		UPDPLY4
+			JZE		PLYUPD4
 			CPA		GR0,='6'
-			JZE		UPDPLY6
+			JZE		PLYUPD6
 			CPA		GR0,='8'
-			JZE		UPDPLY8
+			JZE		PLYUPD8
 			CPA		GR0,='2'
-			JZE		UPDPLY2
-			JUMP	UPDPLYED
+			JZE		PLYUPD2
+			JUMP	PLYUPDAD
 ;----
-UPDPLY4		SUBA	GR5,=1
-			JUMP	UPDPLYCH
+PLYUPD4		SUBA	GR5,=1
+			JUMP	PLYUPDCH
 ;----
-UPDPLY6		ADDA	GR5,=1
-			JUMP	UPDPLYCH
+PLYUPD6		ADDA	GR5,=1
+			JUMP	PLYUPDCH
 ;----
-UPDPLY8		SUBA	GR6,=1
-			JUMP	UPDPLYCH
+PLYUPD8		SUBA	GR6,=1
+			JUMP	PLYUPDCH
 ;----
-UPDPLY2		ADDA	GR6,=1
-			JUMP	UPDPLYCH
+PLYUPD2		ADDA	GR6,=1
+			JUMP	PLYUPDCH
 ;----
 			; 移動先が壁だったら座標を設定しない
-UPDPLYCH	CALL	MEZPEEK
-			CPA		GR7,WCHR
-			JZE		UPDPLYED
+PLYUPDCH	CALL	MAPPEEK
+			AND		GR7,GR7
+			JNZ		PLYUPDAD
+;----
 			ST		GR5,PLYX
 			ST		GR6,PLYY
 ;----
-UPDPLYED	RET
+			; マップデータを設定
+PLYUPDAD	LD		GR0,MSKPLY
+			LD		GR5,PLYX
+			LD		GR6,PLYY
+			CALL	MAPADD
+;----
+PLYUPDED	RET
 ;----
 ;----
 ;======================================
 ; プレイヤーの描画
 ;======================================
-DRWPLY		NOP
-			; プレイヤーを画面に表示
-			LD		GR1,PLYY
-			LD		GR2,SCRBUF,GR1
-			ADDL	GR2,PLYX
-			LD		GR0,PCHR
-			ST		GR0,0,GR2
+PLYDRW		LD		GR0,CHRPLY
+			LD		GR5,PLYX
+			LD		GR6,PLYY
+			CALL	PUTSBUF
+			RET
 ;----
-			; HPを文字列に変換
-			LD		GR0,PLYHP
-			LD		GR1,PLYHPD
-			LAD		GR2,WORKBUF
-			LAD		GR3,0
-			CALL	DECCNV
 ;----
-			; 'HP:'の表示
-			LAD		GR1,SCRHP
-			LD		GR2,PLYHPX0
-			LD		GR3,PLYHPY0
-			LD		GR4,PLYHPD
-			LAD		GR5,1
-			CALL	CPYSBUF
+;**************************************
+; マッププログラム
 ;----
-			; HPの表示
-			LAD		GR1,WORKBUF
-			LD		GR2,PLYHPX1
-			LD		GR3,PLYHPY1
-			LD		GR4,PLYHPD
-			LAD		GR5,1
-			CALL	CPYSBUF
+;----
+;======================================
+; マップデータクリア
+;======================================
+MAPCLR		NOP
+			LAD		GR0,0
+			LAD		GR1,0
+;----
+MAPCLR0		LAD		GR2,0
+			LD		GR3,MAPDATA,GR1
+;----
+MAPCLR1		ST		GR0,0,GR3
+			LAD		GR3,1,GR3
+			LAD		GR2,1,GR2
+			CPA		GR2,MAPDATL
+			JMI		MAPCLR1
+;----
+			LAD		GR1,1,GR1
+			CPA		GR1,MAPDATNM
+			JMI		MAPCLR0
+;----
+			RET
+;----
+;----
+;======================================
+; マップデータに迷路データを設定
+;======================================
+MAPMEZ		NOP
+			LAD		GR1,0
+;----
+MAPMEZ0		LAD		GR2,0
+			LD		GR3,MAPDATA,GR1
+			LD		GR4,MEZDAT,GR1
+;----
+MAPMEZ1		LD		GR0,0,GR4
+			CPA		GR0,CHRWAL
+			JNZ		MAPMEZNX
+;----
+			LD		GR0,0,GR3
+			OR		GR0,MSKWAL
+			ST		GR0,0,GR3
+;----
+MAPMEZNX	LAD		GR4,1,GR4
+			LAD		GR3,1,GR3
+			LAD		GR2,1,GR2
+			CPA		GR2,MEZLLEN
+			JMI		MAPMEZ1
+;----
+			LAD		GR1,1,GR1
+			CPA		GR1,MEZLNUM
+			JMI		MAPMEZ0
+;----
+			RET
+;----
+;----
+;======================================
+; マップデータの取得
+; input  : GR5  X座標
+;          GR6  Y座標
+; return : GR7  データ
+;======================================
+MAPPEEK		LD		GR7,MAPDATA,GR6
+			ADDA	GR7,GR5
+			LD		GR7,0,GR7
+			RET
+;----
+;----
+;======================================
+; マップデータの追加
+; input  : GR0  データ
+;          GR5  X座標
+;          GR6  Y座標
+; work   : GR7
+;======================================
+MAPADD		LD		GR7,MAPDATA,GR6
+			ADDA	GR7,GR5
+			OR		GR0,0,GR7
+			ST		GR0,0,GR7
+			RET
+;----
+;----
+;======================================
+; マップデータの削除
+; input  : GR0  データ
+;          GR5  X座標
+;          GR6  Y座標
+; work   : GR7
+;======================================
+MAPRMV		LD		GR7,MAPDATA,GR6
+			ADDA	GR7,GR5
+			XOR		GR0,0,GR7
+			ST		GR0,0,GR7
+			RET
+;----
+;----
+;======================================
+; マップデータにランダムで追加
+; input  : GR0  データ
+; return : GR5  X座標
+;          GR6  Y座標
+;======================================
+MAPRDADD	NOP
+			; 乱数を取得
+MAPRDAD0	CALL	RND
+			LD		GR5,GR7
+			CALL	RND
+			LD		GR6,GR7
+			; 乱数の範囲を制限
+			AND		GR5,=#001F
+			AND		GR6,=#000F
+			; 範囲外だったらもう一度ランダムを取得
+			CPA		GR5,MEZLLEN
+			JPL		MAPRDAD0
+			JZE		MAPRDAD0
+			CPA		GR6,MEZLNUM
+			JPL		MAPRDAD0
+			JZE		MAPRDAD0
+			; マップデータを取得し既に何か設置されていたら
+			; もう一度ランダムを取得
+			CALL	MAPPEEK
+			OR		GR7,GR7
+			JNZ		MAPRDAD0
+			; 座標を設定
+			CALL	MAPADD
 			RET
 ;----
 ;----
@@ -508,15 +803,12 @@ DRWPLY		NOP
 ; 迷路プログラム
 ;----
 ;----
-;**************************************
-;----
-;----
 ;======================================
 ; 迷路生成
 ;======================================
 MEZCRT		CALL	MEZCLR
 ;----
-			LD		GR0,WCHR
+			LD		GR0,CHRWAL
 ;----
 			; 外壁を埋める
 			; 上下壁
@@ -543,7 +835,7 @@ MEZCRTL1	ST		GR0,MEZL00,GR2
 MEZCRTL2	NOP
 			; 既に壁があったら処理を飛ばす
 			LD		GR2,0,GR1
-			CPA		GR2,CCHR
+			CPA		GR2,CLRCHR
 			JNZ		MEZCRNX0
 ;----
 			; 壁を設定
@@ -555,7 +847,7 @@ RNDL0		CALL	RND
 			LD		GR7,PICH,GR7
 			ADDA	GR7,GR1
 			LD		GR2,0,GR7
-			CPA		GR2,CCHR
+			CPA		GR2,CLRCHR
 			JNZ		RNDL0
 ;----
 			; 棒倒し壁を設定
@@ -574,7 +866,7 @@ MEZCRTL4	NOP
 ;----
 			; 既に壁があったら処理を飛ばす
 			LD		GR3,0,GR1
-			CPA		GR3,CCHR
+			CPA		GR3,CLRCHR
 			JNZ		MEZCRNX1
 ;----
 			; 壁を設定
@@ -589,7 +881,7 @@ RNDL1		CALL	RND
 			LD		GR7,PICH,GR7
 			ADDA	GR7,GR1
 			LD		GR3,0,GR7
-			CPA		GR3,CCHR
+			CPA		GR3,CLRCHR
 			JNZ		RNDL1
 ;----
 			; 棒倒し壁を設定
@@ -615,7 +907,7 @@ PICH		DC	 -31,-1,1,31
 ;======================================
 ; 迷路クリア
 ;======================================
-MEZCLR		LD		GR0,CCHR
+MEZCLR		LD		GR0,CLRCHR
 			LD		GR1,MEZDATSZ
 MEZCLRL		SUBL	GR1,=1
 			ST		GR0,MEZL00,GR1
@@ -645,64 +937,6 @@ MEZDRWL1	LD		GR0,0,GR3
 			LAD		GR1,1,GR1
 			CPA		GR1,MEZLNUM
 			JMI		MEZDRWL0
-			RET
-;----
-;----
-;======================================
-; 迷路のデータを取得
-; input  : GR5  X座標
-;          GR6  Y座標
-; return : GR7  データ
-;======================================
-MEZPEEK		LD		GR7,MEZDAT,GR6
-			ADDA	GR7,GR5
-			LD		GR7,0,GR7
-			RET
-;----
-;----
-;======================================
-; 迷路のデータを設定
-; input  : GR5  X座標
-;          GR6  Y座標
-;          GR7  データ
-; work   : GR4
-;======================================
-MEZPOKE		LD		GR4,MEZDAT,GR6
-			ADDA	GR4,GR5
-			ST		GR7,0,GR4
-			RET
-;----
-;----
-;======================================
-; 迷路のデータをランダム設定
-; input  : GR7  データ
-; return : GR5  X座標
-;          GR6  Y座標
-;======================================
-MEZRDPOK	PUSH	0,GR7
-			; 乱数を取得
-MEZRDPOL	CALL	RND
-			LD		GR5,GR7
-			CALL	RND
-			LD		GR6,GR7
-			; 乱数の範囲を制限
-			AND		GR5,=#001F
-			AND		GR6,=#000F
-			; 範囲外だったらもう一度ランダムを取得
-			CPA		GR5,MEZLLEN
-			JPL		MEZRDPOL
-			JZE		MEZRDPOL
-			CPA		GR6,MEZLNUM
-			JPL		MEZRDPOL
-			JZE		MEZRDPOL
-			; 迷路のデータを取得し壁だったら
-			; もう一度ランダムを取得
-			CALL	MEZPEEK
-			CPA		GR7,CCHR
-			JNZ		MEZRDPOL
-			; 座標を設定
-			POP		GR7
-			CALL	MEZPOKE
 			RET
 ;----
 ;----
@@ -740,13 +974,8 @@ MEZSTR1		DC	MEZL04
 MEZEND1		DC	MEZL11
 ;----
 ;----
-;----
-;----
 ;**************************************
 ; ユーティリティモジュール
-;----
-;----
-;**************************************
 ;----
 ;----
 ;======================================
@@ -831,11 +1060,6 @@ RND			LD		GR7,SEED
 SEED		DC	#3643
 ;----
 ;----
-;----
-;----
-;**************************************
 ; プログラム終了
-;----
-;----
 ;**************************************
 			END
