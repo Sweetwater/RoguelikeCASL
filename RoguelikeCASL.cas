@@ -49,7 +49,7 @@ MAINL		NOP
 			JZE		MAINED
 ;----
 ; !!!!!!!!!!!!!! デバッグ更新処理 !!!!!!!!!!!!!!
-			CALL	DBGUPD
+;			CALL	DBGUPD
 ;----
 			; 更新処理
 			LD		GR1,STATE
@@ -98,6 +98,8 @@ PLYD		DS	1			; ダメージ
 PLYTRGE		DS	1			; 敵ターゲット
 PLYTRGED	DS	1			; 敵ターゲットダメージ
 PLYMNY		DS	1			; お金
+PLYFMNY		DS	1			; フレームのお金
+PLYCUR		DS	1			; 回復
 ;----
 ; 階数情報
 ELVNUM		DS	1
@@ -107,9 +109,9 @@ ELVX		DS	1			; 階段X座標
 ELVY		DS	1			; 階段Y座標
 ;----
 ; 文字キャラクタの定義
-CHRPLY		DC	'Q'			; プレイヤーキャラクタ
+CHRPLY		DC	'>'			; プレイヤーキャラクタ
 CHRWAL		DC	'#'			; 壁キャラクタ
-CHRELV		DC	'z'			; 階段キャラクタ
+CHRELV		DC	'='			; 階段キャラクタ
 CHRMNY		DC	'$'			; お金キャラクタ
 CHRCUR		DC	'+'			; 回復キャラクタ
 CLRCHR		DC	' '			; 空白キャラ
@@ -234,6 +236,8 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 UPD00		LAD		GR0,0
 			ST		GR0,PLYD
 			ST		GR0,PLYTRGED
+			ST		GR0,PLYFMNY
+			ST		GR0,PLYCUR
 			CALL	PLYUPD
 			CALL	EMYUPD
 			CALL	MNYCHK
@@ -355,7 +359,39 @@ DRW00MS3	LAD		GR1,MSG003
 			LD		GR4,MSG003L
 			CALL	CPYMSG2
 ;----
-DRW00MS1	RET
+			; 回復を表示
+DRW00MS1	LD		GR1,PLYCUR
+			JZE		DRW00MS4
+;----
+			; テンプレート文字列をワークバッファにコピー
+			LD		GR0,MSG004L
+			LAD		GR1,MSG004
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			; 回復を設定
+			LD		GR0,PLYCUR
+			LD		GR1,=3
+			LD		GR2,MSG004OF
+			LAD		GR2,WORKBUF,GR2
+			LAD		GR3,0
+			CALL	DECCNV
+;----
+			; 文字列を表示
+			LAD		GR1,WORKBUF
+			LD		GR4,MSG004L
+			CALL	CPYMSG1
+;----
+			; お金を表示
+DRW00MS4	LD		GR1,PLYFMNY
+			JZE		DRW00MS5
+;----
+			; 文字列を表示
+			LAD		GR1,MSG005
+			LD		GR4,MSG005L
+			CALL	CPYMSG1
+;----
+DRW00MS5	RET
 ;----
 ;----
 MSG000		DC	'          に   のダメージを与えた'
@@ -377,8 +413,21 @@ MSG00E1		DC	'ブラボー  '
 MSG00E2		DC	'チャーリー'
 MSG00E3		DC	'デルタ    '
 MSG00E4		DC	'エコー    '
+MSG00E5		DC	'フォックス'
+MSG00E6		DC	'ゴルフ    '
+MSG00E7		DC	'ホテル    '
+MSG00E8		DC	'インディア'
+MSG00E9		DC	'ジュリエト'
 MSG00E		DC	MSG00E0,MSG00E1,MSG00E2,MSG00E3,MSG00E4
+MSG00ET2	DC	MSG00E5,MSG00E6,MSG00E7,MSG00E8,MSG00E9
 MSG00EL		DC	10
+;----
+MSG004		DC	'HPが   回復した!!'
+MSG004L		DC	17
+MSG004OF	DC	4
+;----
+MSG005		DC	'お金を100G拾った………'
+MSG005L		DC	22
 ;----
 ;----
 ;**************************************
@@ -473,6 +522,7 @@ SBUFCLR1	ST		GR4,SCRL00,GR5
 ;         GR5  高さ      壊す
 ;======================================
 CPYSBUF		NOP
+			LD		GR0,GR4
 ;----
 CPYSBUF0	LD		GR7,SCRBUF,GR3
 			ADDL	GR7,GR2
@@ -485,6 +535,7 @@ CPYSBUF1	LD		GR6,0,GR1
 			SUBA	GR4,=1
 			JNZ		CPYSBUF1
 ;----
+			LD		GR4,GR0
 			LAD		GR3,1,GR3
 			SUBA	GR5,=1
 			JNZ		CPYSBUF0
@@ -625,11 +676,25 @@ HUDDRW		NOP
 			LAD		GR5,1
 			CALL	CPYSBUF
 ;----
+			; 操作説明の表示
+			LAD		GR1,HUDMSG0
+			LAD		GR2,32
+			LAD		GR3,7
+			LAD		GR4,8
+			LAD		GR5,6
+			CALL	CPYSBUF
+;----
 			RET
 ;----
 HUDHP		DC	'HP:'
 HUDFLR		DC	'F'
 HUDMNY		DC	'00G'
+HUDMSG0		DC	'移動    '
+HUDMSG1		DC	'     8  '
+HUDMSG2		DC	'   4   6'
+HUDMSG3		DC	'     2  '
+HUDMSG4		DC	'        '
+HUDMSG5		DC	'階段 5  '
 ;----
 ;----
 ;**************************************
@@ -720,7 +785,14 @@ CURCHK		LD		GR5,PLYX
 ;----
 			LD		GR1,PLYHPF
 ;----
-CURCHK0		ST		GR1,PLYHP
+CURCHK0		CPA		GR1,PLYHP
+			JZE		CURCHK1
+;----
+			LD		GR2,GR1
+			SUBL	GR2,PLYHP
+			ST		GR2,PLYCUR
+;----
+CURCHK1		ST		GR1,PLYHP
 ;----
 			LD		GR0,MSKCUR
 			CALL	MAPRMV
@@ -780,6 +852,10 @@ MNYCHK		LD		GR5,PLYX
 			CALL	MAPPEEK
 			AND		GR7,MSKMNY
 			JZE		MNYCHKE
+;----
+			LD		GR1,PLYFMNY
+			LAD		GR1,1,GR1
+			ST		GR1,PLYFMNY
 ;----
 			LD		GR1,PLYMNY
 			LAD		GR1,1,GR1
@@ -842,14 +918,15 @@ EMYSET0		LD		GR0,EMYDAT,GR1
 			JNZ		EMYSET0
 			RET
 ;----
-EMYNUM		DC		5			; 敵数
-EMYX		DS		5			; X座標
-EMYY		DS		5			; Y座標
-EMYDR		DS		5			; 方向
-EMYHP		DS		5			; HP
+EMYNUM		DC		10			; 敵数
+EMYX		DS		10			; X座標
+EMYY		DS		10			; Y座標
+EMYDR		DS		10			; 方向
+EMYHP		DS		10			; HP
 EMYHPF		DC		3			; 初期HP
 ; マップデータに書き込む値
 EMYDAT		DC		#0010,#0020,#0030,#0040,#0050
+EMYDAT2		DC		#0060,#0070,#0080,#0090,#00A0
 ;----
 ;----
 ;======================================
@@ -962,6 +1039,7 @@ EMYDRW1		LAD		GR1,1,GR1
 			RET
 ;----
 EMYCHRS		DC		'a','b','c','d','e'
+EMYCHRS2	DC		'f','g','h','i','j'
 ;----
 ;----
 ;**************************************
