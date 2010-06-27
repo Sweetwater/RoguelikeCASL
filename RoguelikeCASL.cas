@@ -90,7 +90,7 @@ PLYX		DS	1
 PLYY		DS	1
 PLYHP		DS	1
 PLYHPF		DC	20			; HP初期値
-PLYDMG		DS	1			; ダメージ
+PLYD		DS	1			; ダメージ
 PLYTRGE		DS	1			; 敵ターゲット
 PLYTRGED	DS	1			; 敵ターゲットダメージ
 ;----
@@ -235,7 +235,7 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 ; 00更新
 ;--------------------------------------
 UPD00		LAD		GR0,0
-			ST		GR0,PLYDMG
+			ST		GR0,PLYD
 			ST		GR0,PLYTRGED
 			CALL	PLYUPD
 			CALL	EMYUPD
@@ -323,8 +323,9 @@ DRW00MS2	LD		GR0,MSG002L
 ;----
 ;----
 			; プレイヤーにダメージが無かったら表示しない
-DRW00MS0	LD		GR0,PLYDMG
+DRW00MS0	LD		GR0,PLYD
 			JZE		DRW00MS1
+			JMI		DRW00MS3
 ;----
 			; ダメージ受けた表示
 			; テンプレート文字列をワークバッファにコピー
@@ -334,7 +335,7 @@ DRW00MS0	LD		GR0,PLYDMG
 			CALL	CPYDAT
 ;----
 			; ダメージを設定
-			LD		GR0,PLYDMG
+			LD		GR0,PLYD
 			LD		GR1,=3
 			LD		GR2,MSG001OF
 			LAD		GR2,WORKBUF,GR2
@@ -344,6 +345,13 @@ DRW00MS0	LD		GR0,PLYDMG
 			; 文字列を表示
 			LAD		GR1,WORKBUF
 			LD		GR4,MSG001L
+			CALL	CPYMSG2
+			JUMP	DRW00MS1
+;----
+			; 倒された表示
+			; 文字列を表示
+DRW00MS3	LAD		GR1,MSG003
+			LD		GR4,MSG003L
 			CALL	CPYMSG2
 ;----
 DRW00MS1	RET
@@ -359,6 +367,9 @@ MSG001OF	DC	6
 ;----
 MSG002		DC	'          を倒した…'
 MSG002L		DC	20
+;----
+MSG003		DC	'敵に倒された……'
+MSG003L		DC	16
 ;----
 MSG00E0		DC	'アルファ  '
 MSG00E1		DC	'ブラボー  '
@@ -430,15 +441,15 @@ MSG01L		DC	12,14,16
 ; 画面バッファのクリア
 ;======================================
 SBUFCLR		NOP
-;			LD		GR4,CLRCHR
-			LD		GR4,='-'
+			LD		GR4,CLRCHR
+;			LD		GR4,='-'
 			LAD		GR5,0
 ;----
-		; 画面ラインの数分ループ		
+		; 画面ラインの数分ループ
 			LAD		GR1,0
 SBUFCLR0	NOP
 ;----
-		; 画面ラインの長さ分ループ		
+		; 画面ラインの長さ分ループ
 			LAD		GR2,0
 SBUFCLR1	ST		GR4,SCRL00,GR5
 			LAD		GR5,1,GR5
@@ -683,7 +694,7 @@ EMYX		DS		5			; X座標
 EMYY		DS		5			; Y座標
 EMYDR		DS		5			; 方向
 EMYHP		DS		5			; HP
-EMYHPF		DC		2			; 初期HP
+EMYHPF		DC		3			; 初期HP
 ; マップデータに書き込む値
 EMYDAT		DC		#0010,#0020,#0030,#0040,#0050
 ;----
@@ -695,7 +706,21 @@ EMYUPD		LAD		GR1,0
 EMYUPD0		LD		GR0,EMYHP,GR1
 			JZE		EMYUPD3
 ;----
-			LD		GR0,EMYDAT,GR1
+			; プレイヤーが隣にいるか
+			LD		GR0,MSKPLY
+			LD		GR3,EMYX,GR1
+			LD		GR4,EMYY,GR1
+			CALL	MAPNEAR
+			OR		GR7,GR7
+			JZE		EMYUPD4
+;----
+			; 攻撃処理
+			LAD		GR0,3
+			CALL	PLYDMG
+			JUMP	EMYUPD3
+;----
+			; 移動処理
+EMYUPD4		LD		GR0,EMYDAT,GR1
 			LD		GR5,EMYX,GR1
 			LD		GR6,EMYY,GR1
 			CALL	MAPRMV
@@ -749,13 +774,15 @@ EMYDMG		LD		GR2,EMYHP,GR1
 			LD		GR2,EMYHP,GR1
 			SUBA	GR2,GR0
 			ST		GR2,EMYHP,GR1
-			JNZ		EMYDMGE
+			JPL		EMYDMGE
 ;----
 			; 死亡処理
 EMYDMG0		LD		GR0,EMYDAT,GR1
 			LD		GR5,EMYX,GR1
 			LD		GR6,EMYY,GR1
 			CALL	MAPRMV
+			LAD		GR2,0
+			ST		GR2,EMYHP,GR1
 			LAD		GR2,-1
 			ST		GR2,PLYTRGED
 ;----
@@ -825,6 +852,8 @@ PLYOFFY		DC	2
 ;======================================
 PLYUPD		LD		GR0,INBUFL
 			JZE		PLYUPDE
+			LD		GR0,PLYHP
+			JZE		PLYUPDE
 			; マップデータを消去
 			LD		GR0,MSKPLY
 			LD		GR5,PLYX
@@ -888,13 +917,44 @@ PLYUPDE		RET
 ;----
 ;----
 ;======================================
+;  プレイヤーにダメージを与える
+;  input :  GR0  ダメージ
+;======================================
+PLYDMG		LD		GR2,PLYHP
+			JZE		PLYDMGE
+;----
+			LD		GR2,PLYD
+			ADDL	GR2,GR0
+			ST		GR2,PLYD
+;----
+			LD		GR2,PLYHP
+			SUBA	GR2,GR0
+			ST		GR2,PLYHP
+			JPL		PLYDMGE
+;----
+			; 死亡処理
+			LD		GR2,MSKPLY
+			LD		GR5,PLYX
+			LD		GR6,PLYY
+			CALL	MAPRMV
+			LAD		GR2,0
+			ST		GR2,PLYHP
+			LAD		GR2,-1
+			ST		GR2,PLYD
+;----
+PLYDMGE		RET
+;----
+;----
+;======================================
 ; プレイヤーの描画
 ;======================================
-PLYDRW		LD		GR0,CHRPLY
+PLYDRW		LD		GR0,PLYHP
+			JZE		PLYDRWE
+			LD		GR0,CHRPLY
 			LD		GR5,PLYX
 			LD		GR6,PLYY
 			CALL	PUTSBUF
-			RET
+PLYDRWE		RET
 ;----
 ;----
 ;**************************************
@@ -965,6 +1025,51 @@ MAPPEEK		LD		GR7,MAPDATA,GR6
 			ADDA	GR7,GR5
 			LD		GR7,0,GR7
 			RET
+;----
+;----
+;======================================
+; マップデータの近傍を調べる
+; input  : GR0  データ
+;          GR3  X座標
+;          GR4  Y座標
+; return : GR7  0:なし  0以外:データ
+;======================================
+MAPNEAR		NOP
+			LD		GR6,GR4
+;----
+			; 左隣を取得
+			LD		GR5,GR3
+			SUBL	GR5,=1
+			CALL	MAPPEEK
+			AND		GR7,GR0
+			JNZ		MAPNEARE
+;----
+			; 右隣を取得
+			LD		GR5,GR3
+			ADDL	GR5,=1
+			CALL	MAPPEEK
+			AND		GR7,GR0
+			JNZ		MAPNEARE
+;----
+			LD		GR5,GR3
+;----
+			; 上隣を取得
+			LD		GR6,GR4
+			SUBL	GR6,=1
+			CALL	MAPPEEK
+			AND		GR7,GR0
+			JNZ		MAPNEARE
+;----
+			; 下隣を取得
+			LD		GR6,GR4
+			ADDL	GR6,=1
+			CALL	MAPPEEK
+			AND		GR7,GR0
+			JNZ		MAPNEARE
+;----
+			LAD		GR7,0
+;----
+MAPNEARE	RET
 ;----
 ;----
 ;======================================
