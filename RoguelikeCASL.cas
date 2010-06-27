@@ -12,6 +12,10 @@ MAIN		NOP
 			; 初期化処理
 			;--------------------------------------
 ;----
+			; お金の初期化
+			LAD		GR0,0
+			ST		GR0,PLYMNY
+;----
 			; 階数の初期化
 			LAD		GR0,1
 			ST		GR0,ELVNUM
@@ -93,22 +97,10 @@ PLYHPF		DC	20			; HP初期値
 PLYD		DS	1			; ダメージ
 PLYTRGE		DS	1			; 敵ターゲット
 PLYTRGED	DS	1			; 敵ターゲットダメージ
+PLYMNY		DS	1			; お金
 ;----
 ; 階数情報
 ELVNUM		DS	1
-;----
-; HUD情報
-HUDHPD		DC	3			; HP表示桁
-HUDHPX0		DC	32			; HP表示0X座標
-HUDHPX1		DC	35			; HP表示1X座標
-HUDHPY		DC	2			; HP表示Y座標
-HUDHP		DC	'HP:'
-;----
-HUDFLRD		DC	3			; 階数表示桁数
-HUDFLRX0	DC	34			; 階数表0X座標
-HUDFLRX1	DC	37			; 階数表1X座標
-HUDFLRY		DC	1			; 階数表Y座標
-HUDFLR		DC	'F'
 ;----
 ; マップ情報
 ELVX		DS	1			; 階段X座標
@@ -118,15 +110,16 @@ ELVY		DS	1			; 階段Y座標
 CHRPLY		DC	'Q'			; プレイヤーキャラクタ
 CHRWAL		DC	'#'			; 壁キャラクタ
 CHRELV		DC	'z'			; 階段キャラクタ
+CHRMNY		DC	'$'			; お金キャラクタ
 CLRCHR		DC	' '			; 空白キャラ
-CHREMY		DC	'a'			; 敵キャラ
 ;----
 ; マップデータ
 MSKWAL		DC	#8000		; 壁
 MSKPLY		DC	#0100		; プレイヤー
 MSKEMY		DC	#00F0		; 敵
 MSKITM		DC	#000F		; アイテム
-MSKELV		DC	#000F		; 階段
+MSKMNY		DC	#0001		; お金
+MSKELV		DC	#0008		; 階段
 MSKCLO		DC	#FFF0		; 通行止めか
 MAPDAT00	DS	32
 MAPDAT01	DS	32
@@ -225,6 +218,7 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 			CALL	MAPMEZ			; 迷路データをマップデータに設定
 			CALL	ELVSET			; 階段を設定
 			CALL	EMYSET			; 敵を設定
+			CALL	MNYSET			; お金を設定
 			CALL	PLYSET			; プレイヤーの設定
 			LAD		GR0,0			; ステートを00に変更
 			ST		GR0,STATE
@@ -239,6 +233,7 @@ UPD00		LAD		GR0,0
 			ST		GR0,PLYTRGED
 			CALL	PLYUPD
 			CALL	EMYUPD
+			CALL	MNYCHK
 			CALL	ELVCHK
 			; 階段を降りていたらステートを変更
 			OR		GR0,GR0
@@ -254,10 +249,11 @@ UPD00ED		RET
 ;--------------------------------------
 DRW00		CALL	SBUFCLR			; 画面バッファのクリア
 			CALL	MEZDRW			; 迷路の描画
-			CALL	ELVDRW			; 階段の描画
 			CALL	HUDDRW			; HUDの描画
-			CALL	PLYDRW			; プレイヤーの描画
+			CALL	ELVDRW			; 階段の描画
+			CALL	MNYDRW			; お金の描画
 			CALL	EMYDRW			; 敵の描画
+			CALL	PLYDRW			; プレイヤーの描画
 			CALL	DRW00MSG		; メッセージ描画
 			CALL	DRWSBUF			; 画面バッファの描画
 			RET
@@ -563,52 +559,72 @@ NUM1		DC	1
 ;  HUDの描画
 ;======================================
 HUDDRW		NOP
-			; HPを文字列に変換
-			LD		GR0,PLYHP
-			LD		GR1,HUDHPD
+;----
+			; 階数の表示
+			LD		GR0,ELVNUM
+			LAD		GR1,3
 			LAD		GR2,WORKBUF
 			LAD		GR3,0
 			CALL	DECCNV
 ;----
-			; 'HP:'の表示
-			LAD		GR1,HUDHP
-			LD		GR2,HUDHPX0
-			LD		GR3,HUDHPY
-			LD		GR4,HUDHPD
+			LAD		GR0,1
+			LAD		GR1,HUDFLR
+			LAD		GR2,3
+			LAD		GR2,WORKBUF,GR2
+			CALL	CPYDAT
+;----
+			LAD		GR1,WORKBUF
+			LAD		GR2,36
+			LAD		GR3,1
+			LAD		GR4,4
 			LAD		GR5,1
 			CALL	CPYSBUF
 ;----
 			; HPの表示
+			LAD		GR0,3
+			LAD		GR1,HUDHP
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			LD		GR0,PLYHP
+			LAD		GR1,3
+			LAD		GR2,3
+			LAD		GR2,WORKBUF,GR2
+			LAD		GR3,0
+			CALL	DECCNV
+;----
 			LAD		GR1,WORKBUF
-			LD		GR2,HUDHPX1
-			LD		GR3,HUDHPY
-			LD		GR4,HUDHPD
+			LAD		GR2,34
+			LAD		GR3,2
+			LAD		GR4,6
 			LAD		GR5,1
 			CALL	CPYSBUF
 ;----
-			; 階数を文字列に変換
-			LD		GR0,ELVNUM
-			LD		GR1,HUDFLRD
+			; お金の表示
+			LD		GR0,PLYMNY
+			LAD		GR1,5
 			LAD		GR2,WORKBUF
 			LAD		GR3,0
 			CALL	DECCNV
 ;----
-			; 階数の表示
+			LAD		GR0,3
+			LAD		GR1,HUDMNY
+			LAD		GR2,5
+			LAD		GR2,WORKBUF,GR2
+			CALL	CPYDAT
+;----
 			LAD		GR1,WORKBUF
-			LD		GR2,HUDFLRX0
-			LD		GR3,HUDFLRY
-			LD		GR4,HUDFLRD
+			LAD		GR2,32
+			LAD		GR3,3
+			LAD		GR4,8
 			LAD		GR5,1
 			CALL	CPYSBUF
 ;----
-			; 'F'の表示
-			LAD		GR1,HUDFLR
-			LD		GR2,HUDFLRX1
-			LD		GR3,HUDFLRY
-			LAD		GR4,1
-			LAD		GR5,1
-			CALL	CPYSBUF
 			RET
+;----
+HUDHP		DC	'HP:'
+HUDFLR		DC	'F'
+HUDMNY		DC	'00G'
 ;----
 ;----
 ;**************************************
@@ -657,6 +673,69 @@ ELVCHK		LAD		GR0,0
 			LAD		GR0,1
 ;----
 ELVCHKED	RET
+;----
+;----
+;**************************************
+;  お金プログラム
+;----
+;----
+;======================================
+; お金の設定
+;======================================
+MNYSET		LD		GR0,MSKMNY
+			LAD		GR1,0
+MNYSET0		CALL	MAPRDADD
+			ST		GR5,MNYX,GR1
+			ST		GR6,MNYY,GR1
+			LAD		GR1,1,GR1
+			CPA		GR1,MNYNUM
+			JMI		MNYSET0
+;----
+			RET
+;----
+MNYX		DS		5
+MNYY		DS		5
+MNYNUM		DC		5
+;----
+;----
+;======================================
+;  お金の判定
+;======================================
+MNYCHK		LD		GR5,PLYX
+			LD		GR6,PLYY
+			CALL	MAPPEEK
+			AND		GR7,MSKMNY
+			JZE		MNYCHKE
+;----
+			LD		GR1,PLYMNY
+			LAD		GR1,1,GR1
+			ST		GR1,PLYMNY
+;----
+			LD		GR0,MSKMNY
+			CALL	MAPRMV
+;----
+MNYCHKE		RET
+;----
+;----
+;======================================
+; お金の描画
+;======================================
+MNYDRW		LD		GR0,CHRMNY
+			LAD		GR1,0
+;----
+MNYDRW0		LD		GR5,MNYX,GR1
+			LD		GR6,MNYY,GR1
+			CALL	MAPPEEK
+			AND		GR7,MSKMNY
+			JZE		MNYDRW1
+;----
+			CALL	PUTSBUF
+;----
+MNYDRW1		LAD		GR1,1,GR1
+			CPA		GR1,MNYNUM
+			JMI		MNYDRW0
+;----
+			RET
 ;----
 ;----
 ;**************************************
