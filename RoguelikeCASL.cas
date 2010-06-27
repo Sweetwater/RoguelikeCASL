@@ -111,6 +111,7 @@ CHRPLY		DC	'Q'			; プレイヤーキャラクタ
 CHRWAL		DC	'#'			; 壁キャラクタ
 CHRELV		DC	'z'			; 階段キャラクタ
 CHRMNY		DC	'$'			; お金キャラクタ
+CHRCUR		DC	'+'			; 回復キャラクタ
 CLRCHR		DC	' '			; 空白キャラ
 ;----
 ; マップデータ
@@ -119,6 +120,7 @@ MSKPLY		DC	#0100		; プレイヤー
 MSKEMY		DC	#00F0		; 敵
 MSKITM		DC	#000F		; アイテム
 MSKMNY		DC	#0001		; お金
+MSKCUR		DC	#0002		; 回復
 MSKELV		DC	#0008		; 階段
 MSKCLO		DC	#FFF0		; 通行止めか
 MAPDAT00	DS	32
@@ -218,6 +220,7 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 			CALL	MAPMEZ			; 迷路データをマップデータに設定
 			CALL	ELVSET			; 階段を設定
 			CALL	EMYSET			; 敵を設定
+			CALL	CURSET			; 回復を設定
 			CALL	MNYSET			; お金を設定
 			CALL	PLYSET			; プレイヤーの設定
 			LAD		GR0,0			; ステートを00に変更
@@ -234,6 +237,7 @@ UPD00		LAD		GR0,0
 			CALL	PLYUPD
 			CALL	EMYUPD
 			CALL	MNYCHK
+			CALL	CURCHK
 			CALL	ELVCHK
 			; 階段を降りていたらステートを変更
 			OR		GR0,GR0
@@ -252,6 +256,7 @@ DRW00		CALL	SBUFCLR			; 画面バッファのクリア
 			CALL	HUDDRW			; HUDの描画
 			CALL	ELVDRW			; 階段の描画
 			CALL	MNYDRW			; お金の描画
+			CALL	CURDRW			; 回復の描画
 			CALL	EMYDRW			; 敵の描画
 			CALL	PLYDRW			; プレイヤーの描画
 			CALL	DRW00MSG		; メッセージ描画
@@ -673,6 +678,75 @@ ELVCHK		LAD		GR0,0
 			LAD		GR0,1
 ;----
 ELVCHKED	RET
+;----
+;----
+;**************************************
+;  回復プログラム
+;----
+;----
+;======================================
+;  回復の設定
+;======================================
+CURSET		LD		GR0,MSKCUR
+			LAD		GR1,0
+CURSET0		CALL	MAPRDADD
+			ST		GR5,CURX,GR1
+			ST		GR6,CURY,GR1
+			LAD		GR1,1,GR1
+			CPA		GR1,CURNUM
+			JMI		CURSET0
+;----
+			RET
+;----
+CURX		DS		5
+CURY		DS		5
+CURNUM		DC		2
+CURVAL		DC		8
+;----
+;----
+;======================================
+;  回復の判定
+;======================================
+CURCHK		LD		GR5,PLYX
+			LD		GR6,PLYY
+			CALL	MAPPEEK
+			AND		GR7,MSKCUR
+			JZE		CURCHKE
+;----
+			LD		GR1,PLYHP
+			ADDL	GR1,CURVAL
+			CPA		GR1,PLYHPF
+			JMI		CURCHK0
+;----
+			LD		GR1,PLYHPF
+;----
+CURCHK0		ST		GR1,PLYHP
+;----
+			LD		GR0,MSKCUR
+			CALL	MAPRMV
+;----
+CURCHKE		RET
+;----
+;----
+;======================================
+; 回復の描画
+;======================================
+CURDRW		LD		GR0,CHRCUR
+			LAD		GR1,0
+;----
+CURDRW0		LD		GR5,CURX,GR1
+			LD		GR6,CURY,GR1
+			CALL	MAPPEEK
+			AND		GR7,MSKCUR
+			JZE		CURDRW1
+;----
+			CALL	PUTSBUF
+;----
+CURDRW1		LAD		GR1,1,GR1
+			CPA		GR1,CURNUM
+			JMI		CURDRW0
+;----
+			RET
 ;----
 ;----
 ;**************************************
