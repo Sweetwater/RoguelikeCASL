@@ -234,7 +234,10 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 ;--------------------------------------
 ; 00更新
 ;--------------------------------------
-UPD00		CALL	PLYUPD
+UPD00		LAD		GR0,0
+			ST		GR0,PLYDMG
+			ST		GR0,PLYTRGED
+			CALL	PLYUPD
 			CALL	EMYUPD
 			CALL	ELVCHK
 			; 階段を降りていたらステートを変更
@@ -268,7 +271,9 @@ DRW00MSG	NOP
 			; 敵にダメージが無かったら表示しない
 			LD		GR0,PLYTRGED
 			JZE		DRW00MS0
+			JMI		DRW00MS2
 ;----
+			; XXXXXXにダメージ与えた表示
 			; テンプレート文字列をワークバッファにコピー
 			LD		GR0,MSG000L
 			LAD		GR1,MSG000
@@ -294,12 +299,34 @@ DRW00MSG	NOP
 			LAD		GR1,WORKBUF
 			LD		GR4,MSG000L
 			CALL	CPYMSG1
+			JUMP	DRW00MS0
+;----
+;----
+			; XXXXXXを倒した表示
+			; テンプレート文字列をワークバッファにコピー
+DRW00MS2	LD		GR0,MSG002L
+			LAD		GR1,MSG002
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			; 敵の名前をコピー
+			LD		GR0,MSG00EL
+			LD		GR1,PLYTRGE
+			LD		GR1,MSG00E,GR1
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			; 文字列を表示
+			LAD		GR1,WORKBUF
+			LD		GR4,MSG002L
+			CALL	CPYMSG1
 ;----
 ;----
 			; プレイヤーにダメージが無かったら表示しない
 DRW00MS0	LD		GR0,PLYDMG
 			JZE		DRW00MS1
 ;----
+			; ダメージ受けた表示
 			; テンプレート文字列をワークバッファにコピー
 			LD		GR0,MSG001L
 			LAD		GR1,MSG001
@@ -329,6 +356,9 @@ MSG000OF	DC	12
 MSG001		DC	'敵から   のダメージを受けた'
 MSG001L		DC	27
 MSG001OF	DC	6
+;----
+MSG002		DC	'          を倒した…'
+MSG002L		DC	20
 ;----
 MSG00E0		DC	'アルファ  '
 MSG00E1		DC	'ブラボー  '
@@ -641,7 +671,7 @@ EMYSET0		LD		GR0,EMYDAT,GR1
 ;----
 			; HPを設定
 			LD		GR0,EMYHPF
-			ST		GR1,EMYHP,GR1
+			ST		GR0,EMYHP,GR1
 ;----
 			LAD		GR1,1,GR1
 			CPA		GR1,EMYNUM
@@ -653,7 +683,7 @@ EMYX		DS		5			; X座標
 EMYY		DS		5			; Y座標
 EMYDR		DS		5			; 方向
 EMYHP		DS		5			; HP
-EMYHPF		DC		5			; 初期HP
+EMYHPF		DC		2			; 初期HP
 ; マップデータに書き込む値
 EMYDAT		DC		#0010,#0020,#0030,#0040,#0050
 ;----
@@ -662,7 +692,10 @@ EMYDAT		DC		#0010,#0020,#0030,#0040,#0050
 ;  敵の更新
 ;======================================
 EMYUPD		LAD		GR1,0
-EMYUPD0		LD		GR0,EMYDAT,GR1
+EMYUPD0		LD		GR0,EMYHP,GR1
+			JZE		EMYUPD3
+;----
+			LD		GR0,EMYDAT,GR1
 			LD		GR5,EMYX,GR1
 			LD		GR6,EMYY,GR1
 			CALL	MAPRMV
@@ -691,7 +724,7 @@ EMYUPD2		LD		GR0,EMYDAT,GR1
 			LD		GR6,EMYY,GR1
 			CALL	MAPADD
 ;----
-			LAD		GR1,1,GR1
+EMYUPD3		LAD		GR1,1,GR1
 			CPA		GR1,EMYNUM
 			JMI		EMYUPD0
 			RET
@@ -701,16 +734,49 @@ EMYMOVY		DC	0,0,-1,1
 ;----
 ;----
 ;======================================
+;  敵にダメージを与える
+;  input :  GR0  ダメージ
+;           GR1  ID
+;======================================
+EMYDMG		LD		GR2,EMYHP,GR1
+			JZE		EMYDMGE
+;----
+			ST		GR1,PLYTRGE
+			LD		GR2,PLYTRGED
+			ADDL	GR2,GR0
+			ST		GR2,PLYTRGED
+;----
+			LD		GR2,EMYHP,GR1
+			SUBA	GR2,GR0
+			ST		GR2,EMYHP,GR1
+			JNZ		EMYDMGE
+;----
+			; 死亡処理
+EMYDMG0		LD		GR0,EMYDAT,GR1
+			LD		GR5,EMYX,GR1
+			LD		GR6,EMYY,GR1
+			CALL	MAPRMV
+			LAD		GR2,-1
+			ST		GR2,PLYTRGED
+;----
+EMYDMGE		RET
+;----
+;----
+;======================================
 ;  敵の描画
 ;======================================
 EMYDRW		NOP
 			LAD		GR1,0
 ;----
-EMYDRW0		LD		GR0,EMYCHRS,GR1
+EMYDRW0		LD		GR0,EMYHP,GR1
+			JZE		EMYDRW1
+;----
+			LD		GR0,EMYCHRS,GR1
 			LD		GR5,EMYX,GR1
 			LD		GR6,EMYY,GR1
 			CALL	PUTSBUF
-			LAD		GR1,1,GR1
+;----
+EMYDRW1		LAD		GR1,1,GR1
 			CPA		GR1,EMYNUM
 			JNZ		EMYDRW0
 			RET
@@ -758,7 +824,7 @@ PLYOFFY		DC	2
 ; プレイヤーの更新
 ;======================================
 PLYUPD		LD		GR0,INBUFL
-			JZE		PLYUPDED
+			JZE		PLYUPDE
 			; マップデータを消去
 			LD		GR0,MSKPLY
 			LD		GR5,PLYX
@@ -767,42 +833,58 @@ PLYUPD		LD		GR0,INBUFL
 			; 入力によって移動方向を変える
 			LD		GR0,INBUF
 			CPA		GR0,='4'
-			JZE		PLYUPD4
+			JZE		PLYUPD44
 			CPA		GR0,='6'
-			JZE		PLYUPD6
+			JZE		PLYUPD66
 			CPA		GR0,='8'
-			JZE		PLYUPD8
+			JZE		PLYUPD88
 			CPA		GR0,='2'
-			JZE		PLYUPD2
-			JUMP	PLYUPDAD
+			JZE		PLYUPD22
+			JUMP	PLYUPD0
 ;----
-PLYUPD4		SUBA	GR5,=1
-			JUMP	PLYUPDCH
+PLYUPD44	SUBA	GR5,=1
+			JUMP	PLYUPD0
 ;----
-PLYUPD6		ADDA	GR5,=1
-			JUMP	PLYUPDCH
+PLYUPD66	ADDA	GR5,=1
+			JUMP	PLYUPD0
 ;----
-PLYUPD8		SUBA	GR6,=1
-			JUMP	PLYUPDCH
+PLYUPD88	SUBA	GR6,=1
+			JUMP	PLYUPD0
 ;----
-PLYUPD2		ADDA	GR6,=1
-			JUMP	PLYUPDCH
+PLYUPD22	ADDA	GR6,=1
+			JUMP	PLYUPD0
 ;----
-			; 移動先が壁だったら座標を設定しない
-PLYUPDCH	CALL	MAPPEEK
-			AND		GR7,GR7
-			JNZ		PLYUPDAD
+			; 移動先によって処理を変える
+PLYUPD0		CALL	MAPPEEK
+			LD		GR0,GR7
+			; 壁なら移動処理をしない
+			AND		GR7,MSKWAL
+			JNZ		PLYUPD2
 ;----
-			ST		GR5,PLYX
+			; 敵でないなら移動処理
+			LD		GR7,GR0
+			AND		GR7,MSKEMY
+			JZE		PLYUPD1
+;----
+			; 敵ならダメージを与えて移動処理をしない
+			SRL		GR7,4
+			SUBL	GR7,=1
+			LAD		GR0,1
+			LD		GR1,GR7
+			CALL	EMYDMG
+			JUMP	PLYUPD2
+;----
+			; 移動処理
+PLYUPD1		ST		GR5,PLYX
 			ST		GR6,PLYY
 ;----
 			; マップデータを設定
-PLYUPDAD	LD		GR0,MSKPLY
+PLYUPD2		LD		GR0,MSKPLY
 			LD		GR5,PLYX
 			LD		GR6,PLYY
 			CALL	MAPADD
 ;----
-PLYUPDED	RET
+PLYUPDE		RET
 ;----
 ;----
 ;======================================
