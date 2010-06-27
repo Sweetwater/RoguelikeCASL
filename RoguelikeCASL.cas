@@ -83,13 +83,16 @@ DRWTBL		DC	DRW00,DRW01
 INBUF		DS	8
 INBUFL		DS	1
 ; ワークバッファ
-WORKBUF		DS	10
+WORKBUF		DS	64
 ;----
 ; プレイヤー情報
 PLYX		DS	1
 PLYY		DS	1
 PLYHP		DS	1
 PLYHPF		DC	20			; HP初期値
+PLYDMG		DS	1			; ダメージ
+PLYTRGE		DS	1			; 敵ターゲット
+PLYTRGED	DS	1			; 敵ターゲットダメージ
 ;----
 ; 階数情報
 ELVNUM		DS	1
@@ -112,7 +115,7 @@ ELVX		DS	1			; 階段X座標
 ELVY		DS	1			; 階段Y座標
 ;----
 ; 文字キャラクタの定義
-CHRPLY		DC	'@'			; プレイヤーキャラクタ
+CHRPLY		DC	'Q'			; プレイヤーキャラクタ
 CHRWAL		DC	'#'			; 壁キャラクタ
 CHRELV		DC	'z'			; 階段キャラクタ
 CLRCHR		DC	' '			; 空白キャラ
@@ -123,7 +126,7 @@ MSKWAL		DC	#8000		; 壁
 MSKPLY		DC	#0100		; プレイヤー
 MSKEMY		DC	#00F0		; 敵
 MSKITM		DC	#000F		; アイテム
-MSKELV		DC	#0001		; 階段
+MSKELV		DC	#000F		; 階段
 MSKCLO		DC	#FFF0		; 通行止めか
 MAPDAT00	DS	32
 MAPDAT01	DS	32
@@ -252,8 +255,88 @@ DRW00		CALL	SBUFCLR			; 画面バッファのクリア
 			CALL	HUDDRW			; HUDの描画
 			CALL	PLYDRW			; プレイヤーの描画
 			CALL	EMYDRW			; 敵の描画
+			CALL	DRW00MSG		; メッセージ描画
 			CALL	DRWSBUF			; 画面バッファの描画
 			RET
+;----
+;----
+;--------------------------------------
+; 00メッセージ描画
+;--------------------------------------
+DRW00MSG	NOP
+;----
+			; 敵にダメージが無かったら表示しない
+			LD		GR0,PLYTRGED
+			JZE		DRW00MS0
+;----
+			; テンプレート文字列をワークバッファにコピー
+			LD		GR0,MSG000L
+			LAD		GR1,MSG000
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			; 敵の名前をコピー
+			LD		GR0,MSG00EL
+			LD		GR1,PLYTRGE
+			LD		GR1,MSG00E,GR1
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			; ダメージを設定
+			LD		GR0,PLYTRGED
+			LD		GR1,=3
+			LD		GR2,MSG000OF
+			LAD		GR2,WORKBUF,GR2
+			LAD		GR3,0
+			CALL	DECCNV
+;----
+			; 文字列を表示
+			LAD		GR1,WORKBUF
+			LD		GR4,MSG000L
+			CALL	CPYMSG1
+;----
+;----
+			; プレイヤーにダメージが無かったら表示しない
+DRW00MS0	LD		GR0,PLYDMG
+			JZE		DRW00MS1
+;----
+			; テンプレート文字列をワークバッファにコピー
+			LD		GR0,MSG001L
+			LAD		GR1,MSG001
+			LAD		GR2,WORKBUF
+			CALL	CPYDAT
+;----
+			; ダメージを設定
+			LD		GR0,PLYDMG
+			LD		GR1,=3
+			LD		GR2,MSG001OF
+			LAD		GR2,WORKBUF,GR2
+			LAD		GR3,0
+			CALL	DECCNV
+;----
+			; 文字列を表示
+			LAD		GR1,WORKBUF
+			LD		GR4,MSG001L
+			CALL	CPYMSG2
+;----
+DRW00MS1	RET
+;----
+;----
+MSG000		DC	'          に   のダメージを与えた'
+MSG000L		DC	33
+MSG000OF	DC	12
+;----
+MSG001		DC	'敵から   のダメージを受けた'
+MSG001L		DC	27
+MSG001OF	DC	6
+;----
+MSG00E0		DC	'アルファ  '
+MSG00E1		DC	'ブラボー  '
+MSG00E2		DC	'チャーリー'
+MSG00E3		DC	'デルタ    '
+MSG00E4		DC	'エコー    '
+MSG00E		DC	MSG00E0,MSG00E1,MSG00E2,MSG00E3,MSG00E4
+MSG00EL		DC	10
 ;----
 ;----
 ;**************************************
@@ -512,7 +595,7 @@ ELVDRW		LD		GR0,CHRELV
 ;----
 ;----
 ;======================================
-; 階段の判定
+;  階段の判定
 ; return :  GR0  0:階段なし  1:階段降り
 ;======================================
 ELVCHK		LAD		GR0,0
@@ -527,7 +610,8 @@ ELVCHK		LAD		GR0,0
 			LD		GR6,PLYY
 			CALL	MAPPEEK
 			AND		GR7,MSKELV
-			JZE		ELVCHKED
+			CPA		GR7,MSKELV
+			JNZ		ELVCHKED
 ;----
 			LAD		GR0,1
 ;----
@@ -965,7 +1049,7 @@ MEZCRNX1	LAD		GR1,2,GR1
 			LAD		GR1,0
 ;----
 MEZCRT5		CALL	RND
-BRK			AND		GR7,=#001F
+			AND		GR7,=#001F
 			ADDL	GR7,=1
 			CPL		GR7,=29
 			JPL		MEZCRT5
@@ -1147,6 +1231,22 @@ RND			LD		GR7,SEED
 			RET
 ;----
 SEED		DC	#3643
+;----
+;----
+;======================================
+; データコピー関数
+; input  : GR0  長さ
+;          GR1  コピー元アドレス
+;          GR2  コピー先アドレス
+;======================================
+CPYDAT		LD		GR3,GR0
+CPYDAT0		LD		GR4,0,GR1
+			ST		GR4,0,GR2
+			LAD		GR1,1,GR1
+			LAD		GR2,1,GR2
+			SUBL	GR3,=1
+			JNZ		CPYDAT0
+			RET
 ;----
 ;----
 ; プログラム終了
