@@ -119,11 +119,12 @@ CLRCHR		DC	' '			; 空白キャラ
 CHREMY		DC	'a'			; 敵キャラ
 ;----
 ; マップデータ
-MSKWAL		DC	#8000
-MSKELV		DC	#4000
-MSKEMY		DC	#0F00
-MSKITM		DC	#00F0
-MSKPLY		DC	#0001
+MSKWAL		DC	#8000		; 壁
+MSKPLY		DC	#0100		; プレイヤー
+MSKEMY		DC	#00F0		; 敵
+MSKITM		DC	#000F		; アイテム
+MSKELV		DC	#0001		; 階段
+MSKCLO		DC	#FFF0		; 通行止めか
 MAPDAT00	DS	32
 MAPDAT01	DS	32
 MAPDAT02	DS	32
@@ -231,6 +232,7 @@ CHNG00		CALL	MEZCRT			; 迷路の生成
 ; 00更新
 ;--------------------------------------
 UPD00		CALL	PLYUPD
+			CALL	EMYUPD
 			CALL	ELVCHK
 			; 階段を降りていたらステートを変更
 			OR		GR0,GR0
@@ -542,18 +544,76 @@ ELVCHKED	RET
 EMYSET		NOP
 			LAD		GR1,0
 ;----
-EMYSET0		LD		GR0,MSKEMY
+			; 位置を設定
+EMYSET0		LD		GR0,EMYDAT,GR1
 			CALL	MAPRDADD
 			ST		GR5,EMYX,GR1
 			ST		GR6,EMYY,GR1
+;----
+			; 方向を設定
+			CALL	RND
+			AND		GR7,=#0003
+			ST		GR7,EMYDR,GR1
+;----
+			; HPを設定
+			LD		GR0,EMYHPF
+			ST		GR1,EMYHP,GR1
+;----
 			LAD		GR1,1,GR1
 			CPA		GR1,EMYNUM
 			JNZ		EMYSET0
 			RET
 ;----
-EMYNUM		DC		5
-EMYX		DS		5
-EMYY		DS		5
+EMYNUM		DC		5			; 敵数
+EMYX		DS		5			; X座標
+EMYY		DS		5			; Y座標
+EMYDR		DS		5			; 方向
+EMYHP		DS		5			; HP
+EMYHPF		DC		5			; 初期HP
+; マップデータに書き込む値
+EMYDAT		DC		#0010,#0020,#0030,#0040,#0050
+;----
+;----
+;======================================
+;  敵の更新
+;======================================
+EMYUPD		LAD		GR1,0
+EMYUPD0		LD		GR0,EMYDAT,GR1
+			LD		GR5,EMYX,GR1
+			LD		GR6,EMYY,GR1
+			CALL	MAPRMV
+;----
+			LD		GR2,EMYDR,GR1
+			ADDA	GR5,EMYMOVX,GR2
+			ADDA	GR6,EMYMOVY,GR2
+			CALL	MAPPEEK
+			AND		GR7,MSKCLO
+			JZE		EMYUPD1
+;----
+			; 直進できないのでランダムで
+			; 方向を変更
+			CALL	RND
+			AND		GR7,=#0003
+			ST		GR7,EMYDR,GR1
+			JUMP	EMYUPD2
+;----
+			; 移動した座標を設定
+EMYUPD1		ST		GR5,EMYX,GR1
+			ST		GR6,EMYY,GR1
+;----
+			; マップデータを更新
+EMYUPD2		LD		GR0,EMYDAT,GR1
+			LD		GR5,EMYX,GR1
+			LD		GR6,EMYY,GR1
+			CALL	MAPADD
+;----
+			LAD		GR1,1,GR1
+			CPA		GR1,EMYNUM
+			JMI		EMYUPD0
+			RET
+;----
+EMYMOVX		DC	-1,1,0,0
+EMYMOVY		DC	0,0,-1,1
 ;----
 ;----
 ;======================================
@@ -561,15 +621,17 @@ EMYY		DS		5
 ;======================================
 EMYDRW		NOP
 			LAD		GR1,0
-			LD		GR0,CHREMY
 ;----
-EMYDRW0		LD		GR5,EMYX,GR1
+EMYDRW0		LD		GR0,EMYCHRS,GR1
+			LD		GR5,EMYX,GR1
 			LD		GR6,EMYY,GR1
 			CALL	PUTSBUF
 			LAD		GR1,1,GR1
 			CPA		GR1,EMYNUM
 			JNZ		EMYDRW0
 			RET
+;----
+EMYCHRS		DC		'a','b','c','d','e'
 ;----
 ;----
 ;**************************************
@@ -898,6 +960,31 @@ MEZCRNX1	LAD		GR1,2,GR1
 			CPA		GR1,MEZEND1
 			JMI		MEZCRTL3
 ;----
+			; ランダムに壁に穴をあける
+			LD		GR0,CLRCHR
+			LAD		GR1,0
+;----
+MEZCRT5		CALL	RND
+BRK			AND		GR7,=#001F
+			ADDL	GR7,=1
+			CPL		GR7,=29
+			JPL		MEZCRT5
+			LD		GR5,GR7
+;----
+MEZCRT6		CALL	RND
+			AND		GR7,=#000F
+			ADDA	GR7,=1
+			CPA		GR7,=11
+			JPL		MEZCRT6
+			LD		GR6,GR7
+;----
+			LD		GR7,MEZDAT,GR6
+			ADDL	GR7,GR5
+			ST		GR0,0,GR7
+;----
+			LAD		GR1,1,GR1
+			CPA		GR1,MEZDIGNM
+			JMI		MEZCRT5
 ;----
 			RET
 ;----
@@ -972,6 +1059,8 @@ MEZEND0		DC	MEZL03
 ; 二段目以降の開始アドレスと終了アドレス
 MEZSTR1		DC	MEZL04
 MEZEND1		DC	MEZL11
+;----
+MEZDIGNM	DC	20		; 穴をあける壁の数
 ;----
 ;----
 ;**************************************
